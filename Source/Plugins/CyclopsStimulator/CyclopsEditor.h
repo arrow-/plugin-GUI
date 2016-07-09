@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CYCLOPS_EDITOR_H_INCLUDED
 
 #include <VisualizerEditorHeaders.h>
-#include <UIUtilitiesHeaders.h>
 #include "CyclopsCanvas.h"
 #include "CyclopsProcessor.h"
 
@@ -57,12 +56,7 @@ public:
 
     Visualizer* createNewCanvas();
 
-    /** 
-    Unlike processors, which have a minimum set of required methods,
-    editor are completely customized. There are still a couple of
-    sometimes useful overloaded methods, which will appear here
-    */
-
+    void buttonClicked(Button* button);
     /** This method executes whenever a custom button is pressed */
     void buttonEvent(Button* button);
 
@@ -90,16 +84,15 @@ public:
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
-private:
-    // Button that reloads device list
-    ScopedPointer<UtilityButton> refreshButton;
-    // List of all available dvices
-    ScopedPointer<ComboBox> portList;
-    // List of all available baudrates.
-    ScopedPointer<ComboBox> baudrateList;
-    // Parent node
-    CyclopsProcessor* node;
 
+private:
+
+    void prepareCanvasCombo(StringArray& canvasOptions);
+    
+    CyclopsCanvas* connectedCanvas;      /**< Pointer to the canvas which this editor connects */
+    ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
+    CyclopsProcessor* processor;         /**< Parent Processor node */
+    
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
 

@@ -120,17 +120,21 @@ public:
 
     String tabText;
 
-private:
-
-    void initializeSelectors();
+protected: // these should be available to sub-classes if needed.
+    
+    void makeNewWindow();
+    Component* getActiveTabContentComponent();
+    void setActiveTabId(int tindex);
+    void removeTab(int tindex);
+    int addTab(String tab_text, Visualizer* vis_canvas);
     bool isPlaying;
 
     SelectorButton* windowSelector;
     SelectorButton* tabSelector;
 
+private:
+    void initializeSelectors();
     int tabIndex;
-
-
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualizerEditor);
 

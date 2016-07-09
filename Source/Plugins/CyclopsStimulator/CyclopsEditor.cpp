@@ -22,44 +22,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "CyclopsEditor.h"
+//#include <../../Processors/Visualization/DataWindow.h>
 
 namespace cyclops {
-    
+
 CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors)
     : VisualizerEditor   (parentNode, 240, useDefaultParameterEditors)
     //, progress(0, 1.0, 1000)
     , serialLED(new IndicatorLED(CyclopsColours::disconnected, Colours::black))
     , readinessLED(new IndicatorLED(CyclopsColours::notReady, Colours::black))
 {
-    node = (CyclopsProcessor*)parentNode;
+    processor = (CyclopsProcessor*)parentNode;
     tabText = "Cyclops";
-    // Add "port" list
-    portList = new ComboBox();
-    portList->setBounds(desiredWidth-13-60, 39, 60, 18);
-    portList->addListener(this);
-    portList->setTooltip("Select the serial port connected to Cyclops.");
-    portList->addItemList(node->getDevices(), 1);
-    addAndMakeVisible(portList);
 
-    // Add baudrate list
-    baudrateList = new ComboBox();
-    baudrateList->setBounds(desiredWidth-13-60, 63, 60, 18);
-    baudrateList->addListener(this);
-    baudrateList->setTooltip("Set the baud rate (115200 recommended).");
-
-    Array<int> baudrates(node->getBaudrates());
-    for (int i = 0; i < baudrates.size(); i++)
-    {
-        baudrateList->addItem(String(baudrates[i]), baudrates[i]);
+    if (processor->getProcessorCount() == 1){
+        // surely no canvas has been created. So create one now:
+        connectedCanvas = CyclopsCanvas::canvasList.add(new CyclopsCanvas(this));
     }
-    addAndMakeVisible(baudrateList);
+    else{
+        connectedCanvas = CyclopsCanvas::canvasList.getFirst();
+    }
+    jassert(connectedCanvas != nullptr);
+    connectedCanvas->pushEditor(this);
 
-    // Add refresh button
-    refreshButton = new UtilityButton("R", Font("Default", 9, Font::plain));
-    refreshButton->setRadius(3.0f);
-    refreshButton->setBounds(145, 51, 20, 20);
-    refreshButton->addListener(this);
-    addAndMakeVisible(refreshButton);
+    canvasCombo = new ComboBox();
+    canvasCombo->addListener(this);
+    canvasCombo->setTooltip("Select the Cyclops Board which would own this \"hook\".");
+    StringArray canvasOptions;
+    prepareCanvasCombo(canvasOptions);
+    canvasCombo->addItemList(canvasOptions, 1);
+    canvasCombo->setSelectedItemIndex(0);
+    canvasCombo->setBounds((240-90)/2, 30, 90, 25);
+    addAndMakeVisible(canvasCombo);
 
     // Add LEDs
     serialLED->setBounds(169, 6, 12, 12);
@@ -72,13 +66,108 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
 
 CyclopsEditor::~CyclopsEditor()
 {
-    ;
+    //std::cout<<"deleting cledit" << CyclopsProcessor::getProcessorCount() <<std::endl;
+    connectedCanvas->popEditor(this);
+    if (CyclopsProcessor::getProcessorCount() == 0){
+        CyclopsCanvas::canvasList.clear(true);
+    }
 }
 
 
 Visualizer* CyclopsEditor::createNewCanvas()
 {
-    return new CyclopsCanvas(node);
+    return new CyclopsCanvas(this);
+}
+
+
+// This method is used to open the visualizer in a tab or window; override with caution
+void CyclopsEditor::buttonClicked(Button* button)
+{
+    // To handle default buttons, like the Channel Selector Drawer.
+    GenericEditor::buttonClicked(button);
+
+    // Handle the buttons to open the canvas in a tab or window
+    jassert (connectedCanvas != nullptr);
+    std::cout << connectedCanvas->tabIndex << std::endl;
+    if (button == windowSelector) {
+        std::cout << "window:" << std::flush;
+        if (connectedCanvas->tabIndex > -1){
+            std::cout << "tab open--" << std::flush;
+            //AccessClass::getDataViewport()->destroyTab(tabIndex);
+            removeTab(connectedCanvas->tabIndex);
+            connectedCanvas->tabIndex = -1;
+            std::cout << "removed tab--" << std::flush;
+        }
+        // have we created a window already?
+        if (connectedCanvas->dataWindow == nullptr) {
+            std::cout << "no win-exists--" << std::flush;
+            makeNewWindow();
+            // now pass ownership -- very ugly line...
+            connectedCanvas->dataWindow = dataWindow;
+            std::cout << "made win--" << std::flush;
+            connectedCanvas->dataWindow->setContentNonOwned(connectedCanvas, false);
+            connectedCanvas->dataWindow->setVisible(true);
+            // sendNotifWin(true);
+            std::cout << "show" << std::flush;
+        }
+        else {
+            if (connectedCanvas->dataWindow->isVisible()){
+                std::cout << "win is open--" << std::flush;
+                connectedCanvas->dataWindow->setVisible(false);
+                connectedCanvas->dataWindow->setContentNonOwned(0, false);
+                std::cout << "hide, strip" << std::flush;
+                // sendNotifWin(false);
+            }
+            else {
+                std::cout << "win exists--" << std::flush;
+                connectedCanvas->dataWindow->setContentNonOwned(connectedCanvas, false);
+                std::cout << "re-set content--" << std::flush;
+                connectedCanvas->setBounds(0,0,connectedCanvas->getParentWidth(), connectedCanvas->getParentHeight());
+                connectedCanvas->dataWindow->setVisible(true);
+                // sendNotifWin(true);
+                std::cout << "show" << std::flush;
+            }
+        }
+        // sendNotifTab(false);
+    }
+    else if (button == tabSelector) {
+        std::cout << "tab:" << std::flush;
+        int canvas_tab_index = connectedCanvas->tabIndex;
+        if (connectedCanvas->dataWindow != nullptr && connectedCanvas->dataWindow->isVisible()){
+            std::cout << "win is open--" << std::flush;
+            connectedCanvas->dataWindow->setVisible(false);
+            connectedCanvas->dataWindow->setContentNonOwned(0, false);
+            std::cout << "hide, strip--" << std::flush;
+        }
+        if (connectedCanvas->tabIndex > -1){
+            std::cout << "tab open--" << std::flush;
+            if (connectedCanvas == getActiveTabContentComponent()){
+                //AccessClass::getDataViewport()->destroyTab(tabIndex);
+                removeTab(connectedCanvas->tabIndex);
+                connectedCanvas->tabIndex = -1;
+                // sendNotifTab(false);
+                std::cout << "removed tab" << std::flush;
+            }
+            else{
+                // Tab is open but not visible, just switch to it
+                setActiveTabId(canvas_tab_index);
+                // sendNotifTab(true);
+                std::cout << "switching" << std::flush;
+            }
+        }
+        else{
+            //tabIndex = AccessClass::getDataViewport()->addTabToDataViewport(tabText, connectedCanvas, this);
+            std::cout << "add new tab--" << std::flush;
+            connectedCanvas->tabIndex = addTab(tabText, connectedCanvas);
+            // sendNotifWin(true);
+            std::cout << "added!" << std::flush;
+        }
+        // sendNotifWin(false);
+    }
+    std::cout << std::endl;
+    std::cout << connectedCanvas->tabIndex << std::endl;
+    // Pass the button event along to "this" class.
+    buttonEvent(button);
 }
 
 /**
@@ -88,25 +177,16 @@ has to be checked to know which function to perform.
 */
 void CyclopsEditor::buttonEvent(Button* button)
 {
-    if (button == refreshButton)
-    {
-        // Refresh list of devices
-        portList->clear();
-        portList->addItemList(node->getDevices(), 1);
-        GenericEditor::repaint();
-    }
+    ;
 }
 
 void CyclopsEditor::comboBoxChanged(ComboBox* comboBox)
 {
-    // Push new selection to parent node
-    if (comboBox == portList)
-    {
-        node->setDevice(comboBox->getText().toStdString());
-    }
-    else if (comboBox == baudrateList)
-    {
-        node->setBaudrate(comboBox->getSelectedId());
+    if (comboBox == canvasCombo){
+        int selection = canvasCombo->getSelectedId();
+        if (selection > 0){
+            connectedCanvas = CyclopsCanvas::canvasList.getUnchecked(selection-1);
+        }
     }
 }
 
@@ -117,32 +197,18 @@ void CyclopsEditor::timerCallback()
 void CyclopsEditor::paint(Graphics& g)
 {
     GenericEditor::paint(g);
-    /*
-    g.setColour(Colour(193, 208, 69));
-    g.fillEllipse(170, 7, 10, 10);
-    g.setColour(Colour(0, 0, 0));
-    g.drawEllipse(169, 6, 12, 12, 1);
-
-    g.setColour(Colour(193, 208, 69));
-    g.fillEllipse(184, 7, 10, 10);
-    g.setColour(Colour(0, 0, 0));
-    g.drawEllipse(183, 6, 12, 12, 1);*/
 }
 
 void CyclopsEditor::disableAllInputWidgets()
 {
     // Disable the whole gui
-    portList->setEnabled(false);
-    baudrateList->setEnabled(false);
-    refreshButton->setEnabled(false);
+    canvasCombo->setEnabled(false);
 }
 
 void CyclopsEditor::enableAllInputWidgets()
 {
     // Reenable the whole gui
-    portList->setEnabled(true);
-    baudrateList->setEnabled(true);
-    refreshButton->setEnabled(true);
+    canvasCombo->setEnabled(true);
 }
 
 void CyclopsEditor::startAcquisition()
@@ -165,21 +231,23 @@ void CyclopsEditor::updateSettings()
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)
 {
     XmlElement* parameters = xmlNode->createNewChildElement("PARAMETERS");
-
-    parameters->setAttribute("device", portList->getText().toStdString());
-    parameters->setAttribute("baudrate", baudrateList->getSelectedId());
+    parameters->setAttribute("canvas_id", "Cyclops " + String(canvasCombo->getSelectedItemIndex()));
 }
 
 void CyclopsEditor::loadEditorParameters(XmlElement* xmlNode)
 {
-    forEachXmlChildElement(*xmlNode, subNode)
-    {
-        if (subNode->hasTagName("PARAMETERS"))
-        {
-            portList->setText(subNode->getStringAttribute("device", ""));
-            baudrateList->setSelectedId(subNode->getIntAttribute("baudrate"));
+    forEachXmlChildElement(*xmlNode, subNode) {
+        if (subNode->hasTagName("PARAMETERS")) {
+            canvasCombo->setText(subNode->getStringAttribute("canvas_id", ""));
         }
     }
+}
+
+void CyclopsEditor::prepareCanvasCombo(StringArray& canvasOptions)
+{
+    canvasOptions.clear();
+    for (int i=0; i<CyclopsCanvas::canvasList.size(); i++)
+        canvasOptions.add("Cyclops "+String(i));
 }
 
 /*

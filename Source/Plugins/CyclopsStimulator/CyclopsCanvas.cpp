@@ -24,32 +24,58 @@
 #include "CyclopsCanvas.h"
 
 namespace cyclops {
-CyclopsCanvas::CyclopsCanvas(CyclopsProcessor* n) :
-    processor(n)
+
+OwnedArray<CyclopsCanvas> CyclopsCanvas::canvasList;
+std::map<std::string, cl_serial> CyclopsCanvas::SerialMap;
+const int CyclopsCanvas::BAUDRATES[12] = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400};
+
+CyclopsCanvas::CyclopsCanvas(CyclopsEditor* editor) : tabIndex(-1)
+                                                    , dataWindow(nullptr)
+                                                    , progress(0)
+                                                    , in_a_test(false)
 {
-    in_a_test = false;
-    progress = 0;
+    // Add "port" list
+    portCombo = new ComboBox();
+    portCombo->addListener(this);
+    portCombo->setTooltip("Select the serial port on which Cyclops is connected.");
+    portCombo->addItemList(getDevices(), 1);
+    addAndMakeVisible(portCombo);
+
+    // Add refresh button
+    refreshButton = new UtilityButton("R", Font("Default", 9, Font::plain));
+    refreshButton->setRadius(3.0f);
+    refreshButton->addListener(this);
+    addAndMakeVisible(refreshButton);
+
+    // Add baudrate list
+    baudrateCombo = new ComboBox();
+    baudrateCombo->addListener(this);
+    baudrateCombo->setTooltip("Set the baud rate (115200 recommended).");
+
+    Array<int> baudrates(getBaudrates());
+    for (int i = 0; i < baudrates.size(); i++)
+    {
+        baudrateCombo->addItem(String(baudrates[i]), baudrates[i]);
+    }
+    baudrateCombo->setSelectedId(115200);
+    addAndMakeVisible(baudrateCombo);
     // Add TEST buttons
     for (int i=0; i < 4; i++){
-        testButtons.add(new UtilityButton(String("Test") + String(i), Font("Default", 10, Font::bold)));
-        testButtons[i]->setBounds(7+(58*i), 104, 40, 20);
+        testButtons.add(new UtilityButton(String("Test ") + String(i), Font("Default", 11, Font::bold)));
         testButtons[i]->addListener(this);
         addAndMakeVisible(testButtons[i]);
     }
-    //progressBar = new ProgressBar(progress.var);
     progressBar = new ProgressBar(progress);
     progressBar->setPercentageDisplay(false);
-    progressBar->setBounds(2, 106, 236, 16);
     addChildComponent(progressBar);
-
+    pstep = 0.01;
     // communicate with teensy.
     
-    pstep = 0.01;
 }
 
 CyclopsCanvas::~CyclopsCanvas()
 {
-
+    //std::cout<<"deleting clcan"<<std::endl;
 }
 
 void CyclopsCanvas::beginAnimation()
@@ -89,7 +115,14 @@ void CyclopsCanvas::refreshState()
 
 void CyclopsCanvas::resized()
 {
-    std::cout << "Resizing CyclopsCanvas" << std::endl;
+    int width = getWidth(), height = getHeight();
+    baudrateCombo->setBounds(width-75, 5, 70, 20);
+    portCombo->setBounds(width-75-5-60, 5, 60, 20);
+    refreshButton->setBounds(width-75-5-60-5-20, 5, 20, 20);
+    for (int i=0; i < 4; i++){
+        testButtons[i]->setBounds(jmax(100, width-53), jmax(45, (height/5))*(i+1)-(25/2), 50, 25);
+    }
+    progressBar->setBounds(2, height-16, width-4, 16);
 }
 
 /*
@@ -108,6 +141,9 @@ void CyclopsCanvas::disableAllInputWidgets()
     // Disable the whole gui
     for (int i=0; i<4; i++)
         testButtons[i]->setEnabled(false);
+    portCombo->setEnabled(false);
+    baudrateCombo->setEnabled(false);
+    refreshButton->setEnabled(false);
 }
 
 void CyclopsCanvas::enableAllInputWidgets()
@@ -115,6 +151,9 @@ void CyclopsCanvas::enableAllInputWidgets()
     // Reenable the whole gui
     for (int i=0; i<4; i++)
         testButtons[i]->setEnabled(true);
+    portCombo->setEnabled(true);
+    baudrateCombo->setEnabled(true);
+    refreshButton->setEnabled(true);
 }
 
 
@@ -138,25 +177,36 @@ void CyclopsCanvas::buttonClicked(Button* button)
         disableAllInputWidgets();
         std::cout << "Testing LED channel " << test_index << "\n";
         in_a_test = true;
-        //node->testChannel(test_index);
+        //private_serial.testChannel(test_index);
+        progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
         progressBar->setVisible(true);
         startTimer(20);
         test_index = -1;
         //for (auto& )
     }
+    if (button == refreshButton)
+    {
+        // Refresh list of devices
+        portCombo->clear();
+        portCombo->addItemList(getDevices(), 1);
+    }
+}
+
+void CyclopsCanvas::comboBoxChanged(ComboBox* comboBox)
+{
+    if (comboBox == portCombo)
+    {
+        setDevice(comboBox->getText().toStdString());
+    }
+    else if (comboBox == baudrateCombo)
+    {
+        setBaudrate(comboBox->getSelectedId());
+    }
 }
 
 bool CyclopsCanvas::keyPressed(const KeyPress& key)
 {
-
-    KeyPress c = KeyPress::createFromDescription("c");
-
-    if (key.isKeyCode(c.getKeyCode())) // C
-    {
-        std::cout << "Clearing display" << std::endl;
-        return true;
-    }
-    return false;
+    return true;
 }
 
 void CyclopsCanvas::timerCallback()
@@ -173,14 +223,74 @@ void CyclopsCanvas::timerCallback()
     }
 }
 
-void CyclopsCanvas::saveVisualizerParameters(XmlElement* xml)
+bool CyclopsCanvas::screenLikelyNames(const String& portName)
+{
+    #ifdef TARGET_OSX
+        return portName.contains("cu.") || portName.contains("tty.");
+    #endif
+    #ifdef TARGET_LINUX
+        return portName.contains("ttyUSB") || portName.contains("ttyA");
+    #endif
+    return true; // for TARGET_WIN32
+}
+
+StringArray CyclopsCanvas::getDevices()
+{
+    vector<ofSerialDeviceInfo> allDeviceInfos = private_serial.getDeviceList();
+    StringArray allDevices;
+    String portName;
+    for (unsigned int i = 0; i < allDeviceInfos.size(); i++)
+    {
+        portName = allDeviceInfos[i].getDeviceName();
+        if (screenLikelyNames(portName))
+        {
+            allDevices.add(portName);
+        }
+    }
+    return allDevices;
+}
+
+Array<int> CyclopsCanvas::getBaudrates()
+{
+    Array<int> allBaudrates(BAUDRATES, 12);
+    return allBaudrates;
+}
+
+void CyclopsCanvas::setDevice(string port)
 {
     ;
 }
 
-void CyclopsCanvas::loadVisualizerParameters(XmlElement* xml)
+void CyclopsCanvas::setBaudrate(int baudrate)
 {
     ;
+}
+
+void CyclopsCanvas::pushEditor(CyclopsEditor* editor)
+{
+    registeredEditors.push_front(editor);
+}
+
+void CyclopsCanvas::popEditor(CyclopsEditor* editor)
+{
+    registeredEditors.remove(editor);
+}
+
+void CyclopsCanvas::saveVisualizerParameters(XmlElement* xml)
+{
+    XmlElement* parameters = xml->createNewChildElement("PARAMETERS");
+    parameters->setAttribute("device", portCombo->getText().toStdString());
+    parameters->setAttribute("baudrate", baudrateCombo->getSelectedId());
+}
+
+void CyclopsCanvas::loadVisualizerParameters(XmlElement* xml)
+{
+    forEachXmlChildElement(*xml, subNode) {
+        if (subNode->hasTagName("PARAMETERS")) {
+            portCombo->setText(subNode->getStringAttribute("device", ""));
+            baudrateCombo->setSelectedId(subNode->getIntAttribute("baudrate"));
+        }
+    }
 }
 
 } // NAMESPACE cyclops

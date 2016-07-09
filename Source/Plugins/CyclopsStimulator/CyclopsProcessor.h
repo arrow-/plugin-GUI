@@ -34,6 +34,9 @@
 #include <SerialLib.h>
 
 namespace cyclops {
+
+class CyclopsCanvas;
+struct cl_serial;
 /**
   The Cyclops Stimulator controls Cyclops boards to perform optpgenetic
   stimulation.
@@ -63,58 +66,23 @@ public:
         return true;
     }
 
-    /**
-     * @brief      Filters only relevant serial ports (by name).
-     *
-     * @return     ``true`` if a Teensy or Arduino could be connected.
-     */
-    bool screenLikelyNames(const String& portName);
-
-    /**
-     * @brief      Returns a list of all serial devices that are available on
-     *             the system. The list of available devices changes whenever
-     *             devices are connected or removed.
-     */
-    StringArray getDevices();
-
-    /**
-     * @brief      Returns a list of all supported baudrates.
-     */
-    Array<int> getBaudrates();
-
-    /** Setter, that allows you to set the serial device that will be used during acquisition */
-    void setDevice(string device);
-
-    /** Setter, that allows you to set the baudrate that will be used during acquisition */
-    void setBaudrate(int baudrate);
-
     AudioProcessorEditor* createEditor();
 
     bool isReady();
-
     void process(AudioSampleBuffer& buffer, MidiBuffer& events);
-
     void handleEvent(int eventType, MidiMessage& event, int samplePosition = 0);
-
     void setParameter(int parameterIndex, float newValue);
-
     void updateSettings();
 
     bool enable();
     bool disable();
 
+    static int getProcessorCount();
     static ScopedPointer<CyclopsPluginManager> pluginManager;
 
 private:
-    ofSerial* Serial;
-    string    port;
-    int       baud_rate;
-
-    static OwnedArray<ofSerial> SerialObjects;
-    static OwnedArray<string>   PortNames;
-    static OwnedArray<int>      BaudRates;
-    static const int BAUDRATES[12];
-
+    
+    cl_serial* CLSerial;
     static int node_count;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsProcessor);

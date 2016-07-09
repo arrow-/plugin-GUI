@@ -71,7 +71,7 @@ void CyclopsPluginManager::loadPlugins(const File &pluginPath) {
 
     for (int i = 0; i < foundDLLs.size(); i++)
     {
-        std::cout << "Loading Plugin: " << foundDLLs[i].getFileNameWithoutExtension() << "... " << std::flush;
+        std::cout << "CPM>     Loading Plugin: " << foundDLLs[i].getFileNameWithoutExtension() << "... " << std::flush;
         if (loadPlugin(foundDLLs[i].getFullPathName()))
         {
             std::cout << "Loaded" << std::endl;
@@ -97,7 +97,7 @@ void CyclopsPluginManager::loadAllPlugins()
 
     for (auto &pluginPath : paths) {
         if (!pluginPath.isDirectory()) {
-            std::cout << "Plugin path not found: " << pluginPath.getFullPathName() << std::endl;
+            std::cout << "CPM>     (!) Plugin path not found: " << pluginPath.getFullPathName() << std::endl;
         } else {
             loadPlugins(pluginPath);
         }
@@ -190,7 +190,7 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
 
     if (piFunction == nullptr)
     {
-        ERROR_MSG("Failed to load function 'getCyclopsPluginInfo'");
+        ERROR_MSG("CPM>     (!) Failed to load function 'getCyclopsPluginInfo'");
         closeHandle(handle);
         return -1;
     }
@@ -201,11 +201,11 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
     CyclopsPluginInfo pInfo;
     piFunction(pInfo);
     if (pInfo.sourceCount != (int)pInfo.sourceCodeNames.size()){
-        std::cout << "sourceCount doest not match no. of \"Source-Code-Names\".\nFAILED to load plugin" << pInfo.Name << std::endl;
+        std::cout << "CPM>     (!!) sourceCount doest not match no. of \"Source-Code-Names\".\nFAILED to load plugin" << pInfo.Name << std::endl;
         return -1;
     }
     else if (pInfo.sourceCount < 1){
-        std::cout << "No Sources (aka Signals) have been defined for the plugin!\nFAILED to load plugin" << pInfo.Name << std::endl;
+        std::cout << "CPM>     (!!) No Sources (aka Signals) have been defined for the plugin!\nFAILED to load plugin" << pInfo.Name << std::endl;
         return -1;
     }
     // successful load, plugin seems valid.

@@ -26,78 +26,30 @@
 
 namespace cyclops {
 
-OwnedArray<ofSerial>  CyclopsProcessor::SerialObjects;
-OwnedArray<string>    CyclopsProcessor::PortNames;
-OwnedArray<int>       CyclopsProcessor::BaudRates;
-const int CyclopsProcessor::BAUDRATES[12] = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400};
-int       CyclopsProcessor::node_count = 0;
+int CyclopsProcessor::node_count = 0;
 ScopedPointer<CyclopsPluginManager> CyclopsProcessor::pluginManager = new CyclopsPluginManager();
 
 CyclopsProcessor::CyclopsProcessor()
     : GenericProcessor("Cyclops Stimulator")
-    , Serial (new ofSerial)
 {
     node_count++;
-    SerialObjects.add(Serial);
     if (pluginManager->getNumPlugins() == 0){
         std::cout << "CPM> Making Cyclops-Plugin List" << std::endl;
         pluginManager->loadAllPlugins();
-        std::cout << "CPM> Loaded " << pluginManager->getNumPlugins() << " cyclops plugins" << std::endl;
+        std::cout << "CPM> Loaded " << pluginManager->getNumPlugins() << " cyclops plugin(s)." << std::endl;
     }
 }
 
 CyclopsProcessor::~CyclopsProcessor()
 {
-}
-
-bool CyclopsProcessor::screenLikelyNames(const String& portName)
-{
-    #ifdef TARGET_OSX
-        return portName.contains("cu.") || portName.contains("tty.");
-    #endif
-    #ifdef TARGET_LINUX
-        return portName.contains("ttyUSB") || portName.contains("ttyA");
-    #endif
-    return true; // for TARGET_WIN32
-}
-
-StringArray CyclopsProcessor::getDevices()
-{
-    vector<ofSerialDeviceInfo> allDeviceInfos = Serial->getDeviceList();
-    StringArray allDevices;
-    String portName;
-    for (unsigned int i = 0; i < allDeviceInfos.size(); i++)
-    {
-        portName = allDeviceInfos[i].getDeviceName();
-        if (screenLikelyNames(portName))
-        {
-            allDevices.add(portName);
-        }
-    }
-    return allDevices;
-}
-
-Array<int> CyclopsProcessor::getBaudrates()
-{
-    Array<int> allBaudrates(BAUDRATES, 12);
-    return allBaudrates;
-}
-
-void CyclopsProcessor::setDevice(string port)
-{
-    this->port = port;
-}
-
-void CyclopsProcessor::setBaudrate(int baudrate)
-{
-    this->baud_rate = baudrate;
+    node_count--;
+    //std::cout<<"deleting clproc"<<std::endl;
 }
 
 void CyclopsProcessor::updateSettings()
 {
     ;
 }
-
 
 /**
     If the processor uses a custom editor, this method must be present.
@@ -131,14 +83,10 @@ void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int sample
 
 bool CyclopsProcessor::isReady()
 {
-    if (port == "" || baud_rate == 0)
+    if (CLSerial->connectedCanvas == nullptr)
     {
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Serial Port connection error!", "Please set port and baudrate to use first!");
-        return false;
-    }
-    if (!Serial->setup(port, baud_rate))
-    {
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Serial Port connection error!", "Could not connect to specified serial port. Check log files for details.");
+        getEditor()->makeVisible();
+        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Dangling stimulator hook", "Please connect this stimulator-hook to a Cyclops Interface (use drop-down)!");
         return false;
     }
     return true;
@@ -154,6 +102,11 @@ bool CyclopsProcessor::disable()
 {
     //Serial->close();
     return true;
+}
+
+int CyclopsProcessor::getProcessorCount()
+{
+    return node_count;
 }
 
 } // NAMESPACE cyclops

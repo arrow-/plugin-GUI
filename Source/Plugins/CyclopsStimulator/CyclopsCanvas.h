@@ -25,10 +25,17 @@
 #define SPIKEDISPLAYCANVAS_H_
 
 #include <VisualizerWindowHeaders.h>
-#include "CyclopsProcessor.h"
+#include <VisualizerEditorHeaders.h>
+#include <EditorHeaders.h>
+#include <SerialLib.h>
+#include <map>
+#include <forward_list>
+#include <string>
 
 namespace cyclops {
-class CyclopsProcessor;
+
+class CyclopsEditor;
+struct cl_serial;
 
 /**
  * @brief      Holds UI widgets for Cyclops.
@@ -36,9 +43,10 @@ class CyclopsProcessor;
 
 class CyclopsCanvas : public Visualizer
                     , public Button::Listener
+                    , public ComboBox::Listener
 {
 public:
-    CyclopsCanvas(CyclopsProcessor* n);
+    CyclopsCanvas(CyclopsEditor* editor);
     ~CyclopsCanvas();
 
     /** Called when the component's tab becomes visible again.*/
@@ -84,29 +92,83 @@ public:
     float refreshRate;
 
     void buttonClicked(Button* button);
-
+    void comboBoxChanged(ComboBox* comboBox);
     bool keyPressed(const KeyPress& key);
 
     void timerCallback();
-    
+
+    /**
+     * @brief      Filters only relevant serial ports (by name).
+     *
+     * @return     ``true`` if a Teensy or Arduino could be connected.
+     */
+    bool screenLikelyNames(const String& portName);
+
+    /**
+     * @brief      Returns a list of all serial devices that are available on
+     *             the system. The list of available devices changes whenever
+     *             devices are connected or removed.
+     */
+    StringArray getDevices();
+
+    /**
+     * @brief      Returns a list of all supported baudrates.
+     */
+    Array<int> getBaudrates();
+
+    /** Setter, that allows you to set the serial device that will be used during acquisition */
+    void setDevice(string device);
+
+    /** Setter, that allows you to set the baudrate that will be used during acquisition */
+    void setBaudrate(int baudrate);
+
+    void pushEditor(CyclopsEditor* editor);
+    void popEditor(CyclopsEditor* editor);
+
     /** Saves parameters as XML */
     virtual void saveVisualizerParameters(XmlElement* xml);
 
     /** Loads parameters from XML */
     virtual void loadVisualizerParameters(XmlElement* xml);
 
-    CyclopsProcessor* processor;
+    static OwnedArray<CyclopsCanvas> canvasList;
+    
+    int tabIndex;
+    ScopedPointer<DataWindow> dataWindow;
 
 private:
-    // TEST Buttons
-    OwnedArray<UtilityButton> testButtons;
+    
+    ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device list */
+    ScopedPointer<ComboBox> portCombo;          /**< List of all available dvices */
+    ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
+    OwnedArray<UtilityButton> testButtons;      /**< TEST Buttons */
     ScopedPointer<ProgressBar> progressBar;
     // Some state vars for "TEST" UI
     double progress, pstep;
     bool in_a_test;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsCanvas);
+    ofSerial private_serial;
+    std::forward_list<CyclopsEditor*> registeredEditors;
 
+    static std::map<std::string, cl_serial> SerialMap;
+    static const int BAUDRATES[12];
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsCanvas);
+};
+
+struct cl_serial
+{
+    std::string portName;
+    ScopedPointer<ofSerial> Serial;
+    int baudRate;
+    CyclopsCanvas* connectedCanvas;
+
+    cl_serial()
+    {
+        portName = "";
+        Serial = new ofSerial();
+        baudRate = -1;
+        connectedCanvas = nullptr;
+    }
 };
 
 } // NAMESPACE cyclops

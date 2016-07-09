@@ -323,3 +323,31 @@ void VisualizerEditor::loadVisualizerParameters(XmlElement* xml)
 {
 
 }
+
+void VisualizerEditor::makeNewWindow()
+{
+    dataWindow = new DataWindow(windowSelector, tabText);
+}
+
+Component* VisualizerEditor::getActiveTabContentComponent()
+{
+    return AccessClass::getDataViewport()->getCurrentContentComponent();
+}
+
+void VisualizerEditor::setActiveTabId(int tindex)
+{
+    AccessClass::getDataViewport()->selectTab(tindex);
+}
+
+void VisualizerEditor::removeTab(int tindex)
+{
+    AccessClass::getDataViewport()->destroyTab(tindex);
+    tabIndex = -1;
+}
+
+int VisualizerEditor::addTab(String tab_text, Visualizer* vis_canvas)
+{
+    tabText = tab_text;
+    tabIndex = AccessClass::getDataViewport()->addTabToDataViewport(tabText, vis_canvas, this);
+    return tabIndex;
+}
