@@ -324,9 +324,19 @@ void VisualizerEditor::loadVisualizerParameters(XmlElement* xml)
 
 }
 
-void VisualizerEditor::makeNewWindow()
+void VisualizerEditor::makeNewWindow(bool enableCallback)
 {
-    dataWindow = new DataWindow(windowSelector, tabText);
+    if (enableCallback)
+        // used by CyclopsEditor to consistently update windowSelector buttons
+        // even when window is closed.
+        dataWindow = new DataWindow(windowSelector, this, tabText);
+    else
+        dataWindow = new DataWindow(windowSelector, tabText);
+}
+
+void VisualizerEditor::windowClosed()
+{
+
 }
 
 Component* VisualizerEditor::getActiveTabContentComponent()

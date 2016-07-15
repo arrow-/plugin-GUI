@@ -27,13 +27,20 @@
 DataWindow::DataWindow(Button* cButton, String name)
     : DocumentWindow(name,
                      Colours::black,
-                     DocumentWindow::allButtons),
-    controlButton(cButton)
+                     DocumentWindow::allButtons)
+    , controlButton(cButton)
+    , vizEditor(nullptr)
 
 {
     centreWithSize(800,500);
     setUsingNativeTitleBar(true);
     setResizable(true,false);
+}
+
+DataWindow::DataWindow(Button* button, VisualizerEditor* editor, String name)
+    : DataWindow(button, name)
+{
+    vizEditor = editor;
 }
 
 DataWindow::~DataWindow()
@@ -45,5 +52,8 @@ void DataWindow::closeButtonPressed()
 {
     setContentNonOwned(0,false);
     setVisible(false);
-    controlButton->setToggleState(false,dontSendNotification);
+    controlButton->setToggleState(false, dontSendNotification);
+    if (vizEditor != nullptr){
+        dynamic_cast<VisualizerEditor*>(vizEditor)->windowClosed();
+    }
 }

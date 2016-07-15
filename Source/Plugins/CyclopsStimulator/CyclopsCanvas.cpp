@@ -276,6 +276,11 @@ void CyclopsCanvas::popEditor(CyclopsEditor* editor)
     registeredEditors.remove(editor);
 }
 
+const std::forward_list<CyclopsEditor*>& CyclopsCanvas::getRegisteredEditors() const
+{
+    return registeredEditors;
+}
+
 void CyclopsCanvas::saveVisualizerParameters(XmlElement* xml)
 {
     XmlElement* parameters = xml->createNewChildElement("PARAMETERS");

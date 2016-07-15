@@ -88,84 +88,84 @@ void CyclopsEditor::buttonClicked(Button* button)
 
     // Handle the buttons to open the canvas in a tab or window
     jassert (connectedCanvas != nullptr);
-    std::cout << connectedCanvas->tabIndex << std::endl;
+    //std::cout << connectedCanvas->tabIndex << std::endl;
     if (button == windowSelector) {
-        std::cout << "window:" << std::flush;
+        //std::cout << "window:" << std::flush;
         if (connectedCanvas->tabIndex > -1){
-            std::cout << "tab open--" << std::flush;
+            //std::cout << "tab open--" << std::flush;
             //AccessClass::getDataViewport()->destroyTab(tabIndex);
             removeTab(connectedCanvas->tabIndex);
             connectedCanvas->tabIndex = -1;
-            std::cout << "removed tab--" << std::flush;
+            //std::cout << "removed tab--" << std::flush;
         }
         // have we created a window already?
         if (connectedCanvas->dataWindow == nullptr) {
-            std::cout << "no win-exists--" << std::flush;
-            makeNewWindow();
+            //std::cout << "no win-exists--" << std::flush;
+            makeNewWindow(true);
             // now pass ownership -- very ugly line...
             connectedCanvas->dataWindow = dataWindow;
-            std::cout << "made win--" << std::flush;
+            //std::cout << "made win--" << std::flush;
             connectedCanvas->dataWindow->setContentNonOwned(connectedCanvas, false);
             connectedCanvas->dataWindow->setVisible(true);
-            // sendNotifWin(true);
-            std::cout << "show" << std::flush;
+            notifyButtons(Notifs::ALL_WINDOW, true);
+            //std::cout << "show" << std::flush;
         }
         else {
             if (connectedCanvas->dataWindow->isVisible()){
-                std::cout << "win is open--" << std::flush;
+                //std::cout << "win is open--" << std::flush;
                 connectedCanvas->dataWindow->setVisible(false);
                 connectedCanvas->dataWindow->setContentNonOwned(0, false);
-                std::cout << "hide, strip" << std::flush;
-                // sendNotifWin(false);
+                //std::cout << "hide, strip" << std::flush;
+                notifyButtons(Notifs::ALL_WINDOW, false);
             }
             else {
-                std::cout << "win exists--" << std::flush;
+                //std::cout << "win exists--" << std::flush;
                 connectedCanvas->dataWindow->setContentNonOwned(connectedCanvas, false);
-                std::cout << "re-set content--" << std::flush;
+                //std::cout << "re-set content--" << std::flush;
                 connectedCanvas->setBounds(0,0,connectedCanvas->getParentWidth(), connectedCanvas->getParentHeight());
                 connectedCanvas->dataWindow->setVisible(true);
-                // sendNotifWin(true);
-                std::cout << "show" << std::flush;
+                notifyButtons(Notifs::ALL_WINDOW, true);
+                //std::cout << "show" << std::flush;
             }
         }
-        // sendNotifTab(false);
+        notifyButtons(Notifs::ALL_TAB, false);
     }
     else if (button == tabSelector) {
-        std::cout << "tab:" << std::flush;
+        //std::cout << "tab:" << std::flush;
         int canvas_tab_index = connectedCanvas->tabIndex;
         if (connectedCanvas->dataWindow != nullptr && connectedCanvas->dataWindow->isVisible()){
-            std::cout << "win is open--" << std::flush;
+            //std::cout << "win is open--" << std::flush;
             connectedCanvas->dataWindow->setVisible(false);
             connectedCanvas->dataWindow->setContentNonOwned(0, false);
-            std::cout << "hide, strip--" << std::flush;
+            //std::cout << "hide, strip--" << std::flush;
         }
         if (connectedCanvas->tabIndex > -1){
-            std::cout << "tab open--" << std::flush;
+            //std::cout << "tab open--" << std::flush;
             if (connectedCanvas == getActiveTabContentComponent()){
                 //AccessClass::getDataViewport()->destroyTab(tabIndex);
                 removeTab(connectedCanvas->tabIndex);
                 connectedCanvas->tabIndex = -1;
-                // sendNotifTab(false);
-                std::cout << "removed tab" << std::flush;
+                notifyButtons(Notifs::ALL_TAB, false);
+                //std::cout << "removed tab" << std::flush;
             }
             else{
                 // Tab is open but not visible, just switch to it
                 setActiveTabId(canvas_tab_index);
-                // sendNotifTab(true);
-                std::cout << "switching" << std::flush;
+                notifyButtons(Notifs::ALL_TAB, true);
+                //std::cout << "switching" << std::flush;
             }
         }
         else{
             //tabIndex = AccessClass::getDataViewport()->addTabToDataViewport(tabText, connectedCanvas, this);
-            std::cout << "add new tab--" << std::flush;
+            //std::cout << "add new tab--" << std::flush;
             connectedCanvas->tabIndex = addTab(tabText, connectedCanvas);
-            // sendNotifWin(true);
-            std::cout << "added!" << std::flush;
+            notifyButtons(Notifs::ALL_TAB, true);
+            //std::cout << "added!" << std::flush;
         }
-        // sendNotifWin(false);
+        notifyButtons(Notifs::ALL_WINDOW, false);
     }
-    std::cout << std::endl;
-    std::cout << connectedCanvas->tabIndex << std::endl;
+    //std::cout << std::endl;
+    //std::cout << connectedCanvas->tabIndex << std::endl;
     // Pass the button event along to "this" class.
     buttonEvent(button);
 }
@@ -226,6 +226,23 @@ void CyclopsEditor::stopAcquisition()
 void CyclopsEditor::updateSettings()
 {
     ;
+}
+
+void CyclopsEditor::notifyButtons(Notifs component, bool state)
+{
+    if (component == Notifs::ALL_WINDOW) {
+        for (auto& editor : connectedCanvas->getRegisteredEditors())
+            editor->windowSelector->setToggleState(state, dontSendNotification);
+    }
+    else {// if (component == Notifs::ALL_WINDOW)
+        for (auto& editor : connectedCanvas->getRegisteredEditors())
+            editor->tabSelector->setToggleState(state, dontSendNotification);
+    }
+}
+
+void CyclopsEditor::windowClosed()
+{
+    CyclopsEditor::notifyButtons(Notifs::ALL_WINDOW, false);
 }
 
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)

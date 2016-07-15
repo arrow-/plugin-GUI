@@ -124,6 +124,7 @@ public:
 
     void pushEditor(CyclopsEditor* editor);
     void popEditor(CyclopsEditor* editor);
+    const std::forward_list<CyclopsEditor*>& getRegisteredEditors() const;
 
     /** Saves parameters as XML */
     virtual void saveVisualizerParameters(XmlElement* xml);

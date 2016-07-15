@@ -40,7 +40,14 @@ namespace cyclops{
     const Colour notReady       = disconnected;
     const Colour Ready          = connected;
     }
+
+enum class Notifs{
+    ALL_WINDOW,
+    ALL_TAB
+};
+
 class CyclopsProcessor;
+class CyclopsCanvas;
 class IndicatorLED;
 
 class CyclopsEditor : public VisualizerEditor
@@ -81,6 +88,8 @@ public:
         It's called after the processors' same named method.
     */
     void updateSettings();
+    void notifyButtons(Notifs component, bool state);
+    void windowClosed();
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
