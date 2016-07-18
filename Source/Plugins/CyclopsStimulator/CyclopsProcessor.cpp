@@ -83,10 +83,10 @@ void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int sample
 
 bool CyclopsProcessor::isReady()
 {
-    if (CLSerial->connectedCanvas == nullptr)
+    if (!dynamic_cast<CyclopsEditor*>(editor.get())->isReady())
     {
-        getEditor()->makeVisible();
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Dangling stimulator hook", "Please connect this stimulator-hook to a Cyclops Interface (use drop-down)!");
+        editor->makeVisible();
+        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Dangling Cyclops Stimulator hook", "Please connect this stimulator-hook to a Cyclops Interface (use drop-down)!");
         return false;
     }
     return true;

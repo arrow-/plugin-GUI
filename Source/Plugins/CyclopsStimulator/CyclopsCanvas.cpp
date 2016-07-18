@@ -26,13 +26,13 @@
 namespace cyclops {
 
 OwnedArray<CyclopsCanvas> CyclopsCanvas::canvasList;
-std::map<std::string, cl_serial> CyclopsCanvas::SerialMap;
+
 const int CyclopsCanvas::BAUDRATES[12] = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400};
 
-CyclopsCanvas::CyclopsCanvas(CyclopsEditor* editor) : tabIndex(-1)
-                                                    , dataWindow(nullptr)
-                                                    , progress(0)
-                                                    , in_a_test(false)
+CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
+                               , dataWindow(nullptr)
+                               , progress(0)
+                               , in_a_test(false)
 {
     // Add "port" list
     portCombo = new ComboBox();
@@ -156,6 +156,10 @@ void CyclopsCanvas::enableAllInputWidgets()
     refreshButton->setEnabled(true);
 }
 
+bool CyclopsCanvas::isReady()
+{
+    return false;
+}
 
 void CyclopsCanvas::paint(Graphics& g)
 {
@@ -177,7 +181,7 @@ void CyclopsCanvas::buttonClicked(Button* button)
         disableAllInputWidgets();
         std::cout << "Testing LED channel " << test_index << "\n";
         in_a_test = true;
-        //private_serial.testChannel(test_index);
+        //serialInfo.Serial->testChannel(test_index);
         progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
         progressBar->setVisible(true);
         startTimer(20);
@@ -223,28 +227,28 @@ void CyclopsCanvas::timerCallback()
     }
 }
 
-bool CyclopsCanvas::screenLikelyNames(const String& portName)
+bool CyclopsCanvas::screenLikelyNames(const String& port_name)
 {
     #ifdef TARGET_OSX
-        return portName.contains("cu.") || portName.contains("tty.");
+        return port_name.contains("cu.") || port_name.contains("tty.");
     #endif
     #ifdef TARGET_LINUX
-        return portName.contains("ttyUSB") || portName.contains("ttyA");
+        return port_name.contains("ttyUSB") || port_name.contains("ttyA");
     #endif
     return true; // for TARGET_WIN32
 }
 
 StringArray CyclopsCanvas::getDevices()
 {
-    vector<ofSerialDeviceInfo> allDeviceInfos = private_serial.getDeviceList();
+    vector<ofSerialDeviceInfo> allDeviceInfos = serialInfo.Serial->getDeviceList();
     StringArray allDevices;
-    String portName;
+    String port_name;
     for (unsigned int i = 0; i < allDeviceInfos.size(); i++)
     {
-        portName = allDeviceInfos[i].getDeviceName();
-        if (screenLikelyNames(portName))
+        port_name = allDeviceInfos[i].getDeviceName();
+        if (screenLikelyNames(port_name))
         {
-            allDevices.add(portName);
+            allDevices.add(port_name);
         }
     }
     return allDevices;
@@ -266,19 +270,21 @@ void CyclopsCanvas::setBaudrate(int baudrate)
     ;
 }
 
-void CyclopsCanvas::pushEditor(CyclopsEditor* editor)
+void CyclopsCanvas::addListener(CyclopsCanvas::Listener* const newListener)
 {
-    registeredEditors.push_front(editor);
+    canvasEventListeners.add(newListener);
+    // and other info
 }
 
-void CyclopsCanvas::popEditor(CyclopsEditor* editor)
+void CyclopsCanvas::removeListener(CyclopsCanvas::Listener* const oldListener)
 {
-    registeredEditors.remove(editor);
+    canvasEventListeners.remove(oldListener);
+    // and other cleanup!!
 }
 
-const std::forward_list<CyclopsEditor*>& CyclopsCanvas::getRegisteredEditors() const
+void CyclopsCanvas::broadcastButtonState(CanvasEvent whichButton, bool state)
 {
-    return registeredEditors;
+    canvasEventListeners.call(&CyclopsCanvas::Listener::updateButtons, whichButton, state);
 }
 
 void CyclopsCanvas::saveVisualizerParameters(XmlElement* xml)

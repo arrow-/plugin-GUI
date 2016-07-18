@@ -82,7 +82,7 @@ public:
 
 private:
     
-    cl_serial* CLSerial;
+    cl_serial* serialInfo;
     static int node_count;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsProcessor);

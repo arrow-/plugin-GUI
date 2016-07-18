@@ -28,14 +28,32 @@
 #include <VisualizerEditorHeaders.h>
 #include <EditorHeaders.h>
 #include <SerialLib.h>
-#include <map>
-#include <forward_list>
 #include <string>
 
 namespace cyclops {
 
-class CyclopsEditor;
-struct cl_serial;
+enum class CanvasEvent{
+    WINDOW_BUTTON,
+    TAB_BUTTON,
+    SERIAL_LED,
+    READY_LED,
+    TRANSFER_DROP,
+    TRANSFER_MIGRATE
+};
+
+struct cl_serial
+{
+    std::string portName;
+    ScopedPointer<ofSerial> Serial;
+    int baudRate;
+
+    cl_serial()
+    {
+        portName = "";
+        Serial = new ofSerial();
+        baudRate = -1;
+    }
+};
 
 /**
  * @brief      Holds UI widgets for Cyclops.
@@ -46,7 +64,16 @@ class CyclopsCanvas : public Visualizer
                     , public ComboBox::Listener
 {
 public:
-    CyclopsCanvas(CyclopsEditor* editor);
+
+    class Listener{
+    public:
+        virtual void updateIndicators(CanvasEvent LEDtype) = 0;
+        virtual void canvasClosing(CyclopsCanvas* newParentCanvas, CanvasEvent transferMode) = 0;
+        virtual void refreshPluginInfo() = 0;
+        virtual void updateButtons(CanvasEvent whichButton, bool state) = 0;
+    };
+
+    CyclopsCanvas();
     ~CyclopsCanvas();
 
     /** Called when the component's tab becomes visible again.*/
@@ -63,6 +90,8 @@ public:
     /** Enables all input widgets on the editor. */
     void enableAllInputWidgets();
     
+    bool isReady();
+
     void paint(Graphics& g);
 
     /** Called when data acquisition is active.*/
@@ -97,34 +126,15 @@ public:
 
     void timerCallback();
 
-    /**
-     * @brief      Filters only relevant serial ports (by name).
-     *
-     * @return     ``true`` if a Teensy or Arduino could be connected.
-     */
-    bool screenLikelyNames(const String& portName);
-
-    /**
-     * @brief      Returns a list of all serial devices that are available on
-     *             the system. The list of available devices changes whenever
-     *             devices are connected or removed.
-     */
-    StringArray getDevices();
-
-    /**
-     * @brief      Returns a list of all supported baudrates.
-     */
-    Array<int> getBaudrates();
-
     /** Setter, that allows you to set the serial device that will be used during acquisition */
     void setDevice(string device);
 
     /** Setter, that allows you to set the baudrate that will be used during acquisition */
     void setBaudrate(int baudrate);
 
-    void pushEditor(CyclopsEditor* editor);
-    void popEditor(CyclopsEditor* editor);
-    const std::forward_list<CyclopsEditor*>& getRegisteredEditors() const;
+    void addListener(Listener* newListener);
+    void removeListener(Listener* oldListener);
+    void broadcastButtonState(CanvasEvent whichButton, bool state);
 
     /** Saves parameters as XML */
     virtual void saveVisualizerParameters(XmlElement* xml);
@@ -139,6 +149,7 @@ public:
 
 private:
     
+    // GUI stuff
     ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device list */
     ScopedPointer<ComboBox> portCombo;          /**< List of all available dvices */
     ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
@@ -148,28 +159,32 @@ private:
     double progress, pstep;
     bool in_a_test;
 
-    ofSerial private_serial;
-    std::forward_list<CyclopsEditor*> registeredEditors;
+    // serial object
+    cl_serial serialInfo;
+    // listeners
+    ListenerList<Listener> canvasEventListeners;
 
-    static std::map<std::string, cl_serial> SerialMap;
     static const int BAUDRATES[12];
+
+    /**
+     * @brief      Filters only relevant serial ports (by name).
+     *
+     * @return     ``true`` if a Teensy or Arduino could be connected.
+     */
+    bool screenLikelyNames(const String& portName);
+    /**
+     * @brief      Returns a list of all serial devices that are available on
+     *             the system. The list of available devices changes whenever
+     *             devices are connected or removed.
+     */
+    StringArray getDevices();
+
+    /**
+     * @brief      Returns a list of all supported baudrates.
+     */
+    Array<int> getBaudrates();
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsCanvas);
-};
-
-struct cl_serial
-{
-    std::string portName;
-    ScopedPointer<ofSerial> Serial;
-    int baudRate;
-    CyclopsCanvas* connectedCanvas;
-
-    cl_serial()
-    {
-        portName = "";
-        Serial = new ofSerial();
-        baudRate = -1;
-        connectedCanvas = nullptr;
-    }
 };
 
 } // NAMESPACE cyclops

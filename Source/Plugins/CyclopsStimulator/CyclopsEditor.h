@@ -41,19 +41,13 @@ namespace cyclops{
     const Colour Ready          = connected;
     }
 
-enum class Notifs{
-    ALL_WINDOW,
-    ALL_TAB,
-    ALL_BUT_THIS_WINDOW,
-    ALL_BUT_THIS_TAB,
-};
-
 class CyclopsProcessor;
 class CyclopsCanvas;
 class IndicatorLED;
 
 class CyclopsEditor : public VisualizerEditor
                     , public ComboBox::Listener
+                    , public CyclopsCanvas::Listener
 {
 public:
     
@@ -88,6 +82,8 @@ public:
     /** Enables all input widgets on the editor. */
     void enableAllInputWidgets();
 
+    bool isReady();
+
     /** Called to inform the editor that acquisition is about to start*/
     void startAcquisition();
 
@@ -98,14 +94,18 @@ public:
         It's called after the processors' same named method.
     */
     void updateSettings();
-    void notifyButtons(Notifs whichComponents, bool state);
+    
+    void updateIndicators(CanvasEvent LEDtype);
+    void canvasClosing(CyclopsCanvas* newParentCanvas, CanvasEvent transferMode);
+    void refreshPluginInfo();
+    void updateButtons(CanvasEvent whichButton, bool state);
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
 
 private:
 
-    void prepareCanvasCombo(StringArray& canvasOptions);
+    void prepareCanvasComboList(StringArray& canvasOptions);
     
     CyclopsCanvas* connectedCanvas;      /**< Pointer to the canvas which this editor connects */
     ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
