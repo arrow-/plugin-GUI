@@ -116,7 +116,8 @@ VisualizerEditor::~VisualizerEditor()
     {
 		AccessClass::getDataViewport()->destroyTab(tabIndex);
     }
-
+    if (dataWindow != nullptr)
+        dataWindow->removeListener(this);
     deleteAllChildren();
 
 }
@@ -194,6 +195,7 @@ void VisualizerEditor::buttonClicked(Button* button)
             dataWindow = new DataWindow(windowSelector, tabText);
             dataWindow->setContentNonOwned(canvas, false);
             dataWindow->setVisible(true);
+            dataWindow->addListener(this);
             //canvas->refreshState();
 
         }
@@ -313,6 +315,10 @@ void VisualizerEditor::loadCustomParameters(XmlElement* xml)
     }
 }
 
+void VisualizerEditor::windowClosed()
+{
+    std::cout<<"closing ve"<<std::endl;
+}
 
 void VisualizerEditor::saveVisualizerParameters(XmlElement* xml)
 {
@@ -324,22 +330,26 @@ void VisualizerEditor::loadVisualizerParameters(XmlElement* xml)
 
 }
 
-void VisualizerEditor::makeNewWindow(bool enableCallback)
+void VisualizerEditor::makeNewWindow()
 {
-    if (enableCallback)
-        // used by CyclopsEditor to consistently update windowSelector buttons
-        // even when window is closed.
-        dataWindow = new DataWindow(windowSelector, this, tabText);
-    else
-        dataWindow = new DataWindow(windowSelector, tabText);
+    dataWindow = new DataWindow(windowSelector, tabText);
 }
 
-void VisualizerEditor::windowClosed()
+void VisualizerEditor::addWindowListener(DataWindow* dw, DataWindow::Listener* newListener)
 {
-
+    if (dw != nullptr && newListener != nullptr){
+        dw->addListener(newListener);
+    }
 }
 
-Component* VisualizerEditor::getActiveTabContentComponent()
+void VisualizerEditor::removeWindowListener(DataWindow* dw, DataWindow::Listener* oldListener)
+{
+    if (dw != nullptr && oldListener != nullptr){
+        dw->removeListener(oldListener);
+    }
+}
+
+Component* VisualizerEditor::getActiveTabContentComponent() const
 {
     return AccessClass::getDataViewport()->getCurrentContentComponent();
 }

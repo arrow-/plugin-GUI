@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "CyclopsEditor.h"
-//#include <../../Processors/Visualization/DataWindow.h>
 
 namespace cyclops {
 
@@ -52,8 +51,14 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     prepareCanvasCombo(canvasOptions);
     canvasCombo->addItemList(canvasOptions, 1);
     canvasCombo->setSelectedItemIndex(0);
-    canvasCombo->setBounds((240-90)/2, 30, 90, 25);
+    canvasCombo->setBounds((240-85)*5/6, 30, 90, 25);
     addAndMakeVisible(canvasCombo);
+
+    comboText = new Label("combo label", "Select Device:");
+    comboText->setBounds(3,27,200,30);
+    comboText->setFont(Font("Default", 16, Font::plain));
+    comboText->setColour(Label::textColourId, Colours::black);
+    addAndMakeVisible(comboText);
 
     // Add LEDs
     serialLED->setBounds(169, 6, 12, 12);
@@ -71,6 +76,8 @@ CyclopsEditor::~CyclopsEditor()
     if (CyclopsProcessor::getProcessorCount() == 0){
         CyclopsCanvas::canvasList.clear(true);
     }
+    if (connectedCanvas->dataWindow != nullptr)
+        VisualizerEditor::removeWindowListener(connectedCanvas->dataWindow, this);
 }
 
 
@@ -101,7 +108,7 @@ void CyclopsEditor::buttonClicked(Button* button)
         // have we created a window already?
         if (connectedCanvas->dataWindow == nullptr) {
             //std::cout << "no win-exists--" << std::flush;
-            makeNewWindow(true);
+            makeNewWindow();
             // now pass ownership -- very ugly line...
             connectedCanvas->dataWindow = dataWindow;
             //std::cout << "made win--" << std::flush;
@@ -128,6 +135,7 @@ void CyclopsEditor::buttonClicked(Button* button)
                 //std::cout << "show" << std::flush;
             }
         }
+        VisualizerEditor::addWindowListener(connectedCanvas->dataWindow, this);
         notifyButtons(Notifs::ALL_TAB, false);
     }
     else if (button == tabSelector) {
@@ -168,6 +176,11 @@ void CyclopsEditor::buttonClicked(Button* button)
     //std::cout << connectedCanvas->tabIndex << std::endl;
     // Pass the button event along to "this" class.
     buttonEvent(button);
+}
+
+void CyclopsEditor::windowClosed()
+{
+    windowSelector->setToggleState(false, dontSendNotification);
 }
 
 /**
@@ -228,21 +241,24 @@ void CyclopsEditor::updateSettings()
     ;
 }
 
-void CyclopsEditor::notifyButtons(Notifs component, bool state)
+void CyclopsEditor::notifyButtons(Notifs whichComponents, bool state)
 {
-    if (component == Notifs::ALL_WINDOW) {
-        for (auto& editor : connectedCanvas->getRegisteredEditors())
+    for (auto& editor : connectedCanvas->getRegisteredEditors())
+    {
+        switch (whichComponents)
+        {
+        case Notifs::ALL_WINDOW :
             editor->windowSelector->setToggleState(state, dontSendNotification);
-    }
-    else {// if (component == Notifs::ALL_WINDOW)
-        for (auto& editor : connectedCanvas->getRegisteredEditors())
-            editor->tabSelector->setToggleState(state, dontSendNotification);
-    }
-}
+            break;
 
-void CyclopsEditor::windowClosed()
-{
-    CyclopsEditor::notifyButtons(Notifs::ALL_WINDOW, false);
+        case Notifs::ALL_TAB :
+                editor->tabSelector->setToggleState(state, dontSendNotification);
+            break;
+
+        default:
+            break;
+        }
+    }
 }
 
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)

@@ -117,8 +117,8 @@ void CyclopsCanvas::resized()
 {
     int width = getWidth(), height = getHeight();
     baudrateCombo->setBounds(width-75, 5, 70, 20);
-    portCombo->setBounds(width-75-5-60, 5, 60, 20);
-    refreshButton->setBounds(width-75-5-60-5-20, 5, 20, 20);
+    portCombo->setBounds(width-75-5-70, 5, 70, 20);
+    refreshButton->setBounds(width-75-5-70-5-20, 5, 20, 20);
     for (int i=0; i < 4; i++){
         testButtons[i]->setBounds(jmax(100, width-53), jmax(45, (height/5))*(i+1)-(25/2), 50, 25);
     }

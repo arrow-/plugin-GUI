@@ -65,6 +65,7 @@ private:
 */
 
 class PLUGIN_API VisualizerEditor : public GenericEditor
+                                  , public DataWindow::Listener
 {
 public:
     /**
@@ -91,6 +92,17 @@ public:
      */
     void buttonClicked(Button* button);
 	
+    /**
+     * @brief      Called when the window is closed.
+     * @details    It is safe to "delete" a DataWindow instance from this
+     *             callback/listener. This would (typically) not be done,
+     *             because instances of DataWindow are (typically) "owned" by
+     *             Editors, and will be deleted when the Editor dies.
+     * @note       VisualizerEditor owns DataWindow instance. See cyclops::CyclopsEditor
+     *             for a use case.
+     */
+    void windowClosed();
+
 	/**
      * @brief      All additional buttons that you create _for the editor_ should be handled here.
      */
@@ -103,8 +115,6 @@ public:
 
     virtual void enable();
     virtual void disable();
-
-    virtual void windowClosed();
 
     void editorWasClicked();
 
@@ -131,15 +141,10 @@ protected: // these should be available to sub-classes if needed.
      * @details    Use this to make a new DataWindow. If needed, you can
      *             transfer ownership of the new object from
      *             VisualizerEditor::dataWindow to _your_ own ScopedPointer.
-     *
-     * @param[in]  enableCallbacks  **When** ``true``, it passes "``this``" to
-     *                              constructor of the DataWindow and
-     *                              VisualizerEditor::windowClosed() is invoked
-     *                              when window is closed. **When** ``false``,
-     *                              ``this`` is not passed and callback does not
-     *                              happen.
      */
-    void makeNewWindow(bool enableCallbacks = false);
+    void makeNewWindow();
+    static void addWindowListener(DataWindow* dw, DataWindow::Listener* newListener);
+    static void removeWindowListener(DataWindow* dw, DataWindow::Listener* oldListener);
 
     /**
      * @brief      Use this to efficiently compare or find what is on the

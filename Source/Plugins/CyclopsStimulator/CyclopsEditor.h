@@ -43,7 +43,9 @@ namespace cyclops{
 
 enum class Notifs{
     ALL_WINDOW,
-    ALL_TAB
+    ALL_TAB,
+    ALL_BUT_THIS_WINDOW,
+    ALL_BUT_THIS_TAB,
 };
 
 class CyclopsProcessor;
@@ -64,6 +66,14 @@ public:
     Visualizer* createNewCanvas();
 
     void buttonClicked(Button* button);
+
+    /**
+     * @brief      Called when the shared window is closed. Used to update the
+     *             SelectorButton state of _other_ CyclopsEditors.
+     * @details    Does not delete instance of DataWindow.
+     */
+    void windowClosed();
+
     /** This method executes whenever a custom button is pressed */
     void buttonEvent(Button* button);
 
@@ -88,8 +98,7 @@ public:
         It's called after the processors' same named method.
     */
     void updateSettings();
-    void notifyButtons(Notifs component, bool state);
-    void windowClosed();
+    void notifyButtons(Notifs whichComponents, bool state);
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
@@ -101,7 +110,8 @@ private:
     CyclopsCanvas* connectedCanvas;      /**< Pointer to the canvas which this editor connects */
     ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
     CyclopsProcessor* processor;         /**< Parent Processor node */
-    
+    ScopedPointer<Label> comboText;
+
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
 
