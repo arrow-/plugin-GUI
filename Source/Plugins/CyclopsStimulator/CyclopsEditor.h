@@ -97,15 +97,19 @@ public:
     
     void updateIndicators(CanvasEvent LEDtype);
     void canvasClosing(CyclopsCanvas* newParentCanvas, CanvasEvent transferMode);
+    void changeCanvas(CyclopsCanvas* dest);
     void refreshPluginInfo();
     void updateButtons(CanvasEvent whichButton, bool state);
+    void setInteractivity(CanvasEvent interactivity);
+    int  getEditorId();
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
 
 private:
 
-    void prepareCanvasComboList(StringArray& canvasOptions);
+    int prepareCanvasComboList(ComboBox* combobox);
+    void updateSelectorButtons();
     
     CyclopsCanvas* connectedCanvas;      /**< Pointer to the canvas which this editor connects */
     ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
@@ -124,8 +128,8 @@ class IndicatorLED : public Component
 public:
     IndicatorLED (const Colour& fill, const Colour& line);
     void paint (Graphics& g);
-    void update (const Colour& fill, String& tooltip);
-    void update (const Colour& fill, const Colour& line, String& tooltip);
+    void update (const Colour& fill, String tooltip);
+    void update (const Colour& fill, const Colour& line, String tooltip);
 private:
     Colour fillColour, lineColour;
 };

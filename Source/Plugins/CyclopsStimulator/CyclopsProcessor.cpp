@@ -86,7 +86,7 @@ bool CyclopsProcessor::isReady()
     if (!dynamic_cast<CyclopsEditor*>(editor.get())->isReady())
     {
         editor->makeVisible();
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Dangling Cyclops Stimulator hook", "Please connect this stimulator-hook to a Cyclops Interface (use drop-down)!");
+        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Prepare this hook", "Please configure this Cyclops Stimulator-hook correctly!");
         return false;
     }
     return true;

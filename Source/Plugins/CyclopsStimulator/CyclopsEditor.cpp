@@ -31,28 +31,29 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     , serialLED(new IndicatorLED(CyclopsColours::disconnected, Colours::black))
     , readinessLED(new IndicatorLED(CyclopsColours::notReady, Colours::black))
 {
-    processor = (CyclopsProcessor*)parentNode;
-    tabText = "Cyclops";
-
+    processor = static_cast<CyclopsProcessor*>(parentNode);
     if (processor->getProcessorCount() == 1){
         // surely no canvas has been created. So create one now:
         connectedCanvas = CyclopsCanvas::canvasList.add(new CyclopsCanvas());
+        connectedCanvas->setRealIndex(0); // must be called whenever new Canvas is made
     }
     else{
+        // connect this editor to the "first" canvas BY DEFAULT.
+        // Editors must always be connected to a canvas.
+        // BUT canvas may not have any listeners.
         connectedCanvas = CyclopsCanvas::canvasList.getFirst();
+        updateSelectorButtons();
     }
     jassert(connectedCanvas != nullptr);
+    // listen to events from canvas
     connectedCanvas->addListener(this);
 
+    // add GUI elements
     canvasCombo = new ComboBox();
     canvasCombo->addListener(this);
     canvasCombo->setTooltip("Select the Cyclops Board which would own this \"hook\".");
-    StringArray canvasOptions;
-    prepareCanvasComboList(canvasOptions);
-    canvasCombo->addItemList(canvasOptions, 1);
-    canvasCombo->addSeparator();
-    canvasCombo->addItem("New", -1);
-    canvasCombo->setSelectedItemIndex(1);
+    prepareCanvasComboList(canvasCombo);
+    canvasCombo->setSelectedId(1, dontSendNotification);
     canvasCombo->setBounds((240-85)*5/6, 30, 90, 25);
     addAndMakeVisible(canvasCombo);
 
@@ -69,24 +70,43 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     addAndMakeVisible(serialLED);
     addAndMakeVisible(readinessLED);
 
+    connectedCanvas->refresh();
     // communicate with teensy.
 }
 
 CyclopsEditor::~CyclopsEditor()
 {
-    //std::cout<<"deleting cledit" << CyclopsProcessor::getProcessorCount() <<std::endl;
+    //std::cout<<"deleting cl_editor" << std::endl;
     connectedCanvas->removeListener(this);
+    connectedCanvas->refresh();
     if (CyclopsProcessor::getProcessorCount() == 0){
+        // This is the last CyclopsEditor to be removed, remove all canvases.
+        // Needed for garbage collection.
         CyclopsCanvas::canvasList.clear(true);
     }
     if (connectedCanvas->dataWindow != nullptr)
         VisualizerEditor::removeWindowListener(connectedCanvas->dataWindow, this);
 }
 
-
+/* @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ * @                                           @
+ * @    THIS METHOD SHOULD NEVER BE CALLED!!   @
+ * @                                           @
+ * @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ */
+// we never need this method. That's why there's no setRealIndex() method around
 Visualizer* CyclopsEditor::createNewCanvas()
 {
-    return new CyclopsCanvas();
+    // VisualizerEditor calls this in buttonClicked() If someone changes
+    // VisualizerEditor, such that this is called from elsewhere, then Cyclops
+    // Plugin WILL FAIL
+    //
+    // (Failure is desired)
+    //
+    // Is this a sign of very bad coupling? It's not if VisualizerEditor is not
+    // edited often.
+    CyclopsCanvas* cc = nullptr;
+    return cc;
 }
 
 
@@ -98,7 +118,6 @@ void CyclopsEditor::buttonClicked(Button* button)
 
     // Handle the buttons to open the canvas in a tab or window
     jassert (connectedCanvas != nullptr);
-    //std::cout << connectedCanvas->tabIndex << std::endl;
     if (button == windowSelector) {
         //std::cout << "window:" << std::flush;
         if (connectedCanvas->tabIndex > -1){
@@ -116,6 +135,7 @@ void CyclopsEditor::buttonClicked(Button* button)
             connectedCanvas->dataWindow = dataWindow;
             //std::cout << "made win--" << std::flush;
             connectedCanvas->dataWindow->setContentNonOwned(connectedCanvas, false);
+            connectedCanvas->dataWindow->setName("Cyclops B" + String(connectedCanvas->realIndex));
             connectedCanvas->dataWindow->setVisible(true);
             connectedCanvas->broadcastButtonState(CanvasEvent::WINDOW_BUTTON, true);
             //std::cout << "show" << std::flush;
@@ -138,6 +158,7 @@ void CyclopsEditor::buttonClicked(Button* button)
                 //std::cout << "show" << std::flush;
             }
         }
+        // listen to DataWindow::Listener::windowClosed
         VisualizerEditor::addWindowListener(connectedCanvas->dataWindow, this);
         connectedCanvas->broadcastButtonState(CanvasEvent::TAB_BUTTON, false);
     }
@@ -169,7 +190,7 @@ void CyclopsEditor::buttonClicked(Button* button)
         else{
             //tabIndex = AccessClass::getDataViewport()->addTabToDataViewport(tabText, connectedCanvas, this);
             //std::cout << "add new tab--" << std::flush;
-            connectedCanvas->tabIndex = addTab(tabText, connectedCanvas);
+            connectedCanvas->tabIndex = addTab("Cyclops B"+String(connectedCanvas->realIndex), connectedCanvas);
             connectedCanvas->broadcastButtonState(CanvasEvent::TAB_BUTTON, true);
             //std::cout << "added!" << std::flush;
         }
@@ -199,12 +220,32 @@ void CyclopsEditor::buttonEvent(Button* button)
 void CyclopsEditor::comboBoxChanged(ComboBox* comboBox)
 {
     if (comboBox == canvasCombo){
+        CyclopsCanvas *oldCanvas = connectedCanvas, *newCanvas;
         int selection = canvasCombo->getSelectedId();
+
         if (selection > 0 && selection < canvasCombo->getNumItems()){
-            connectedCanvas->removeListener(this);
-            connectedCanvas = CyclopsCanvas::canvasList.getUnchecked(selection-1);
-            connectedCanvas->addListener(this);
+            // switch to another canvas, with all settings
+            newCanvas = CyclopsCanvas::canvasList.getUnchecked(selection-1);
+            jassert (CyclopsCanvas::migrateEditor(newCanvas, oldCanvas, this) == 0);
+            oldCanvas->removeListener(this);
+            newCanvas->addListener(this);
         }
+        else{
+            //std::cout << "create new canvas" <<std::endl;
+            oldCanvas->removeListener(this);
+            newCanvas = CyclopsCanvas::canvasList.add(new CyclopsCanvas());
+            newCanvas->addListener(this);
+            int num_canvases = prepareCanvasComboList(canvasCombo);
+            newCanvas->setRealIndex(num_canvases-1); // must be called whenever new Canvas is made
+            
+            canvasCombo->setSelectedId(num_canvases, dontSendNotification);
+            canvasCombo->repaint();
+            oldCanvas->repaint();
+            newCanvas->repaint();
+        }
+        // obviously,
+        connectedCanvas = newCanvas;
+        updateSelectorButtons();
     }
 }
 
@@ -219,13 +260,13 @@ void CyclopsEditor::paint(Graphics& g)
 
 void CyclopsEditor::disableAllInputWidgets()
 {
-    // Disable the whole gui
+    // Disable the whole editor
     canvasCombo->setEnabled(false);
 }
 
 void CyclopsEditor::enableAllInputWidgets()
 {
-    // Reenable the whole gui
+    // Reenable the whole editor
     canvasCombo->setEnabled(true);
 }
 
@@ -254,6 +295,12 @@ void CyclopsEditor::updateSettings()
 void CyclopsEditor::updateIndicators(CanvasEvent LEDtype)
 {
     // read connectedCanvas state
+    const cl_serial* serial = connectedCanvas->getSerialInfo();
+    if (serial->portName == "")
+        serialLED->update(CyclopsColours::disconnected, "Not Connected");
+    else
+        serialLED->update(CyclopsColours::connected, "Connected");
+    serialLED->repaint();
     // update the LED
 }
 
@@ -274,6 +321,14 @@ void CyclopsEditor::canvasClosing(CyclopsCanvas* newParentCanvas, CanvasEvent tr
     }
 }
 
+void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
+{
+    connectedCanvas = dest;
+    canvasCombo->setSelectedId(dest->realIndex+1, dontSendNotification); // don't invoke callback, because migration has been completed, the
+                                                                         // the callback would re-migrate!
+    updateSelectorButtons();
+}
+
 void CyclopsEditor::refreshPluginInfo()
 {
     // connectedCanvas->getPluginInfoForHookID(hook_id);
@@ -285,15 +340,37 @@ void CyclopsEditor::updateButtons(CanvasEvent whichButton, bool state)
     {
     case CanvasEvent::WINDOW_BUTTON :
         windowSelector->setToggleState(state, dontSendNotification);
-        break;
+    break;
 
     case CanvasEvent::TAB_BUTTON:
         tabSelector->setToggleState(state, dontSendNotification);
-        break;
+    break;
 
     default:
-        break;
+    break;
     }
+}
+
+void CyclopsEditor::setInteractivity(CanvasEvent interactivity)
+{
+    switch (interactivity)
+    {
+    case CanvasEvent::FREEZE :
+        disableAllInputWidgets();
+    break;
+
+    case CanvasEvent::THAW :
+        enableAllInputWidgets();
+    break;
+    
+    default:
+    break;
+    }
+}
+
+int CyclopsEditor::getEditorId()
+{
+    return nodeId;
 }
 
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)
@@ -311,13 +388,31 @@ void CyclopsEditor::loadEditorParameters(XmlElement* xmlNode)
     }
 }
 
-void CyclopsEditor::prepareCanvasComboList(StringArray& canvasOptions)
+int CyclopsEditor::prepareCanvasComboList(ComboBox* combobox)
 {
-    canvasOptions.clear();
-    for (int i=0; i<CyclopsCanvas::canvasList.size(); i++)
+    combobox->clear(dontSendNotification);
+    StringArray canvasOptions;
+    int num_canvases = CyclopsCanvas::canvasList.size();
+    for (int i=0; i<num_canvases; i++)
         canvasOptions.add("Cyclops "+String(i));
+    combobox->addItemList(canvasOptions, 1);
+    combobox->addSeparator();
+    combobox->addItem("New", -1);
+    return num_canvases;
 }
 
+
+void CyclopsEditor::updateSelectorButtons()
+{
+    if (connectedCanvas->tabIndex > 0)
+        tabSelector->setToggleState(true, dontSendNotification);
+    else
+        tabSelector->setToggleState(false, dontSendNotification);
+    if (connectedCanvas->dataWindow != nullptr && connectedCanvas->dataWindow->isVisible())
+        windowSelector->setToggleState(true, dontSendNotification);
+    else
+        windowSelector->setToggleState(false, dontSendNotification);
+}
 /*
   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
   |                                 INDICATOR LEDS                                |
@@ -338,13 +433,13 @@ void IndicatorLED::paint(Graphics& g)
     g.drawEllipse(1, 1, getWidth()-2, getHeight()-2, 1.2);
 }
 
-void IndicatorLED::update(const Colour& fill, String& tooltip)
+void IndicatorLED::update(const Colour& fill, String tooltip)
 {
     fillColour = fill;
     setTooltip(tooltip);
 }
 
-void IndicatorLED::update(const Colour& fill, const Colour& line, String& tooltip)
+void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip)
 {
     fillColour = fill;
     lineColour = line;
