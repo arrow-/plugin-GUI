@@ -177,7 +177,6 @@ int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, Cyclop
     return 0;
 }
 
-// this DOES NOT REFRESH CANVAS!!
 int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId)
 {
     CyclopsCanvas::Listener* listener = CyclopsCanvas::findById(src, nodeId);
