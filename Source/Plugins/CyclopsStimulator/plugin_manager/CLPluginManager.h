@@ -15,6 +15,8 @@ public:
     void loadPlugins(const File &pluginPath);
     int loadPlugin(const String&);
     void removeAllPlugins();
+
+    void getPluginNames(StringArray& name_list);
     CyclopsPluginInfo* getInfo(const std::string& pName); // this is not same as getCLPluginInfo()
     int getNumPlugins();
 private:

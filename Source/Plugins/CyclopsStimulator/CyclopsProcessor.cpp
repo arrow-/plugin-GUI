@@ -27,17 +27,11 @@
 namespace cyclops {
 
 int CyclopsProcessor::node_count = 0;
-ScopedPointer<CyclopsPluginManager> CyclopsProcessor::pluginManager = new CyclopsPluginManager();
 
 CyclopsProcessor::CyclopsProcessor()
     : GenericProcessor("Cyclops Stimulator")
 {
     node_count++;
-    if (pluginManager->getNumPlugins() == 0){
-        std::cout << "CPM> Making Cyclops-Plugin List" << std::endl;
-        pluginManager->loadAllPlugins();
-        std::cout << "CPM> Loaded " << pluginManager->getNumPlugins() << " cyclops plugin(s)." << std::endl;
-    }
 }
 
 CyclopsProcessor::~CyclopsProcessor()

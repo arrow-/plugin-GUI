@@ -213,6 +213,14 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
     return 1;
 }
 
+void CyclopsPluginManager::getPluginNames(StringArray& name_list)
+{
+    name_list.clear();
+    for (auto& name_info_Pair : pInfoMap){
+        name_list.add(name_info_Pair.first);
+    }
+}
+
 CyclopsPluginInfo* CyclopsPluginManager::getInfo(const std::string& pName)
 {
     return &(pInfoMap[pName]);

@@ -78,7 +78,6 @@ public:
     bool disable();
 
     static int getProcessorCount();
-    static ScopedPointer<CyclopsPluginManager> pluginManager;
 
 private:
     

@@ -29,6 +29,8 @@ OwnedArray<CyclopsCanvas> CyclopsCanvas::canvasList;
 OwnedArray<HookView>      CyclopsCanvas::hookViews;
 int                       CyclopsCanvas::numCanvases = 0;
 
+ScopedPointer<CyclopsPluginManager> CyclopsCanvas::pluginManager = new CyclopsPluginManager();
+
 const int CyclopsCanvas::BAUDRATES[12] = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400};
 
 CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
@@ -84,6 +86,17 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     hookViewDisplay = new HookViewDisplay(this);
     hookViewport = new HookViewport(hookViewDisplay);
     addAndMakeVisible(hookViewport);
+
+    refreshPlugins();
+}
+
+void CyclopsCanvas::refreshPlugins()
+{
+    if (pluginManager->getNumPlugins() == 0){
+        std::cout << "CPM> Making Cyclops-Plugin List" << std::endl;
+        pluginManager->loadAllPlugins();
+        std::cout << "CPM> Loaded " << pluginManager->getNumPlugins() << " cyclops plugin(s)." << std::endl;
+    }
 }
 
 CyclopsCanvas::~CyclopsCanvas()
@@ -572,8 +585,22 @@ HookView::HookView(int node_id) : nodeId(node_id)
     hookIdLabel->setColour(Label::textColourId, Colours::black);
     addAndMakeVisible(hookIdLabel);
 
+    pluginSelect = new ComboBox();
+    pluginSelect->setTooltip("Select the sub-plugin for this \"hook\".");
+    StringArray nameList;
+    CyclopsCanvas::pluginManager->getPluginNames(nameList);
+    pluginSelect->addItemList(nameList, 1);
+    pluginSelect->setTextWhenNothingSelected("Choose");
+    addAndMakeVisible(pluginSelect);
+
+
     hookInfo = new HookInfo(nodeId);
     setSize(80, 45);
+}
+
+void HookView::comboBoxChanged(ComboBox* cb)
+{
+
 }
 
 void HookView::paint(Graphics& g)
@@ -583,7 +610,8 @@ void HookView::paint(Graphics& g)
 
 void HookView::resized()
 {
-    hookIdLabel->setBounds(5, 0, 80, 30);
+    hookIdLabel->setBounds(5, 0, 35, 30);
+    pluginSelect->setBounds(40, 2, 180, 30);
 }
 
 void HookView::refresh()

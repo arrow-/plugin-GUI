@@ -30,7 +30,7 @@
 #include <SerialLib.h>
 #include <string>
 
-#include "plugin_manager/CyclopsPlugin.h"
+#include "plugin_manager/CLPluginManager.h"
 
 namespace cyclops {
 
@@ -98,7 +98,7 @@ public:
         ScopedPointer<UtilityButton> butt;
     };*/
     CyclopsCanvas();
-    void setRealIndex(int real_index);
+    void refreshPlugins();
     ~CyclopsCanvas();
 
     /** Called when the component's tab becomes visible again.*/
@@ -203,6 +203,7 @@ public:
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow=true);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId);
     
+    static ScopedPointer<CyclopsPluginManager> pluginManager;
     static OwnedArray<CyclopsCanvas> canvasList;
     static OwnedArray<HookView> hookViews;
 
@@ -323,13 +324,16 @@ public:
 
 
 class HookView : public Component
+               , public ComboBox::Listener
 {
 public:
     int nodeId;
     ScopedPointer<Label> hookIdLabel;
+    ScopedPointer<ComboBox> pluginSelect;
     ScopedPointer<HookInfo> hookInfo;
 
     HookView(int node_id);
+    void comboBoxChanged(ComboBox* cb);
     void refresh();
     void paint(Graphics& g);
     void resized();
