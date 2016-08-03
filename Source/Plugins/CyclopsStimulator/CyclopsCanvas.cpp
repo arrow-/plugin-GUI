@@ -26,6 +26,8 @@
 namespace cyclops {
 
 OwnedArray<CyclopsCanvas> CyclopsCanvas::canvasList;
+OwnedArray<HookView>      CyclopsCanvas::hookViews;
+int                       CyclopsCanvas::numCanvases = 0;
 
 const int CyclopsCanvas::BAUDRATES[12] = {300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400};
 
@@ -35,6 +37,7 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
                                , progress(0)
                                , in_a_test(false)
 {
+    realIndex = CyclopsCanvas::numCanvases++; // 0 onwards
     // Add "port" list
     portCombo = new ComboBox();
     portCombo->addListener(this);
@@ -81,20 +84,11 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     hookViewDisplay = new HookViewDisplay(this);
     hookViewport = new HookViewport(hookViewDisplay);
     addAndMakeVisible(hookViewport);
-
-    /*bfbf = new HookViewDisplay(this);
-    bfbf->setBounds(0, 0, 100, 100);
-    addAndMakeVisible(bfbf);*/
-}
-
-void CyclopsCanvas::setRealIndex(int real_index)
-{
-    realIndex = real_index;
 }
 
 CyclopsCanvas::~CyclopsCanvas()
 {
-    //std::cout<<"deleting clcan"<<std::endl;
+    
 }
 
 void CyclopsCanvas::beginAnimation()
@@ -153,7 +147,7 @@ void CyclopsCanvas::resized()
 
 int CyclopsCanvas::getNumCanvas()
 {
-    return canvasList.size();
+    return CyclopsCanvas::canvasList.size();
 }
 
 void CyclopsCanvas::getEditorIds(CyclopsCanvas* cc, Array<int>& editorIdList)
@@ -163,13 +157,25 @@ void CyclopsCanvas::getEditorIds(CyclopsCanvas* cc, Array<int>& editorIdList)
     }
 }
 
-int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow)
+int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow /*=true*/)
 {
-    std::cout << "migrating " << listener->getEditorId() << " to Cyclops B" << dest->realIndex << std::endl;
+    int node_id = listener->getEditorId();
+    std::cout << "migrating " << node_id << " to Cyclops B" << dest->realIndex << std::endl;
     // update combo selection
+    for (int i=0; i<CyclopsCanvas::canvasList.size(); i++){
+        if (CyclopsCanvas::canvasList[i]->realIndex == dest->realIndex)
+            break;
+    }
     listener->changeCanvas(dest);
+    listener->updateButtons(CanvasEvent::COMBO_BUTTON, true);
+
     src->removeListener(listener);
+    HookView* hv = CyclopsCanvas::getHookView(node_id);
+    jassert(hv != nullptr);
+    src->hookViewDisplay->removeChildComponent(hv);
     dest->addListener(listener);
+    dest->hookViewDisplay->addAndMakeVisible(hv);
+    
     if (refreshNow) {
         dest->refresh();
         src->refresh();
@@ -179,9 +185,17 @@ int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, Cyclop
 
 int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId)
 {
-    CyclopsCanvas::Listener* listener = CyclopsCanvas::findById(src, nodeId);
+    CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(src, nodeId);
     jassert (listener != nullptr);
     return CyclopsCanvas::migrateEditor(dest, src, listener, false);
+}
+
+void CyclopsCanvas::dropEditor(CyclopsCanvas* closingCanvas, int node_id)
+{
+    CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(closingCanvas, node_id);
+    jassert (listener != nullptr);
+    listener->updateIndicators(CanvasEvent::TRANSFER_DROP);
+    listener->changeCanvas(nullptr);
 }
 
 void CyclopsCanvas::refresh()
@@ -212,7 +226,7 @@ void CyclopsCanvas::enableAllInputWidgets()
 
 bool CyclopsCanvas::isReady()
 {
-    return false;
+    return true;
 }
 
 void CyclopsCanvas::paint(Graphics& g)
@@ -253,7 +267,7 @@ void CyclopsCanvas::buttonClicked(Button* button)
     else if (button == closeButton)
     {
         // close this canvas!
-        int choice = AlertWindow::showYesNoCancelBox (AlertWindow::QuestionIcon, "Migrate or Drop?", "Choose 'Migrate' if you want to preserve the configuration of hooks and sub-plugins,\nand move (some / all of) the hooks to another Cyclops\nOR\nChoose 'Drop' to orphan the hooks.", "Migrate", "Drop", "Cancel");
+        int choice = AlertWindow::showYesNoCancelBox (AlertWindow::QuestionIcon, "Migrate or Drop?", "Choose 'Migrate' if you want to preserve the configuration of hooks and sub-plugins,\nand move (some / all of) the hooks to another Cyclops\nOR\nChoose 'Drop' to orphan all the hooks.", "Migrate some", "Drop all", "Cancel");
         switch (choice){
         case 0: // cancel, do nothing
         break;
@@ -379,6 +393,33 @@ void CyclopsCanvas::removeListener(CyclopsCanvas::Listener* const oldListener)
     // and other cleanup!!
 }
 
+void CyclopsCanvas::addHook(int node_id)
+{
+    HookView* hv = CyclopsCanvas::hookViews.add(new HookView(node_id));
+    hookViewDisplay->addAndMakeVisible(hv);
+}
+
+bool CyclopsCanvas::removeHook(int node_id)
+{
+    HookView* hv = getHookView(node_id);
+    if (hv == nullptr)
+        return false;
+    CyclopsCanvas::hookViews.removeObject(hv, true); // deletes
+    return true;
+}
+
+HookView* CyclopsCanvas::getHookView(int node_id)
+{
+    HookView* res = nullptr;
+    for (auto& hv : CyclopsCanvas::hookViews){
+        if (hv->nodeId == node_id){
+            res = hv;
+            break;
+        }
+    }
+    return res;
+}
+
 void CyclopsCanvas::broadcastButtonState(CanvasEvent whichButton, bool state)
 {
     canvasEventListeners.call(&CyclopsCanvas::Listener::updateButtons, whichButton, state);
@@ -387,6 +428,13 @@ void CyclopsCanvas::broadcastButtonState(CanvasEvent whichButton, bool state)
 void CyclopsCanvas::broadcastEditorInteractivity(CanvasEvent interactivity)
 {
     canvasEventListeners.call(&CyclopsCanvas::Listener::setInteractivity, interactivity);
+}
+
+void CyclopsCanvas::broadcastNewCanvas()
+{
+    for (auto& c : CyclopsCanvas::canvasList){
+        c->broadcastButtonState(CanvasEvent::COMBO_BUTTON, true);
+    }
 }
 
 int  CyclopsCanvas::getNumListeners()
@@ -411,7 +459,7 @@ void CyclopsCanvas::loadVisualizerParameters(XmlElement* xml)
     }
 }
 
-CyclopsCanvas::Listener* CyclopsCanvas::findById(CyclopsCanvas* cc, int nodeId)
+CyclopsCanvas::Listener* CyclopsCanvas::findListenerById(CyclopsCanvas* cc, int nodeId)
 {
     auto& listener_list = cc->canvasEventListeners.getListeners();
     for (auto& listener : listener_list){
@@ -480,43 +528,25 @@ void HookViewDisplay::paint(Graphics& g)
 
 void HookViewDisplay::refresh()
 {
-    Array<int> newIds;
-    CyclopsCanvas::getEditorIds(canvas, newIds);
-    // find first index where the 2 arrays deviate.
-    int newSize = newIds.size(),
-        oldSize = shownIds.size(),
-        runLength = min(newSize, oldSize),
-        deviant;
-    Rectangle<int> dirty;
-    if (newSize < oldSize){
-        // find deleted EditorId
-        for (deviant=0; deviant<runLength; deviant++)
-            if (newIds[deviant] != shownIds[deviant])
-                break;
-        shownIds.remove(deviant);
-        hookViews.remove(deviant);
-        dirty.setBounds(5, 50+deviant*45, getWidth()-80, 45*(oldSize-deviant));
+    shownIds.clear();
+    CyclopsCanvas::getEditorIds(canvas, shownIds);
+    for (int i=0; i<shownIds.size(); i++){
+        HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
+        jassert(hv != nullptr);
+        jassert(isParentOf(hv));
+        hv->setBounds(5, 50+i*(hv->getHeight()+5), getWidth()-80, hv->getHeight());
+        hv->repaint();
     }
-    else if (newSize > oldSize){
-        for (deviant=0; deviant<runLength; deviant++)
-            if (newIds[deviant] != shownIds[deviant])
-                break;
-        shownIds.insert(deviant, newIds[deviant]);
-        HookView *hv = hookViews.insert(deviant, new HookView(newIds[deviant]));
-        addAndMakeVisible(hv);
-        dirty.setBounds(5, 50+deviant*45, getWidth()-80, 45*(newSize-deviant));
-    }
-    //repaint();
-    repaint(dirty);
+    repaint();
 }
 
 void HookViewDisplay::resized()
 {
-    int index = 0;
-    for (auto& hv : hookViews){
-        hv->setBounds(5, 50+index*45, getWidth()-80, 40);
-        //std::cout << "rs " << index << " " << hv->nodeId<<std::endl;
-        index++;
+    for (int i=0; i<shownIds.size(); i++){
+        HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
+        jassert(hv != nullptr);
+        jassert(isParentOf(hv));
+        hv->setSize(getWidth()-80, 45);
     }
 }
 
@@ -541,6 +571,9 @@ HookView::HookView(int node_id) : nodeId(node_id)
     hookIdLabel->setFont(Font("Default", 16, Font::plain));
     hookIdLabel->setColour(Label::textColourId, Colours::black);
     addAndMakeVisible(hookIdLabel);
+
+    hookInfo = new HookInfo(nodeId);
+    setSize(80, 45);
 }
 
 void HookView::paint(Graphics& g)
@@ -552,6 +585,28 @@ void HookView::resized()
 {
     hookIdLabel->setBounds(5, 0, 80, 30);
 }
+
+void HookView::refresh()
+{
+    // parse all things in HookInfo
+    repaint();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+HookInfo::HookInfo(int node_id) : nodeId(node_id), plugin(nullptr) {}
+
+
+
 
 
 
@@ -572,12 +627,18 @@ MigrateComponent::MigrateComponent(CyclopsCanvas* closing_canvas) : closingCanva
 
     canvasCombo = new ComboBox("target_canvas");
 
+    allEditorsButton = new ToggleButton("All");
+    addAndMakeVisible(allEditorsButton);
+    allEditorsButton->addListener(this);
+
     int num_canvases = CyclopsCanvas::getNumCanvas();
     CyclopsCanvas::getEditorIds(closingCanvas, editorIdList);
     for (auto& editorId : editorIdList){
         ToggleButton* tb = editorButtonList.add(new ToggleButton(String(editorId)));
         //tb->setRadioGroupId(editorId);
+        tb->setToggleState(false, dontSendNotification);
         addAndMakeVisible(tb);
+        tb->addListener(this);
     }
     
     comboText = new Label("combo label", "Migrate to");
@@ -586,30 +647,33 @@ MigrateComponent::MigrateComponent(CyclopsCanvas* closing_canvas) : closingCanva
     addAndMakeVisible(comboText);
 
     for (int i=0; i<num_canvases; i++){
-        if (i != closingCanvas->realIndex){
-            canvasCombo->addItem("Cyclops" + String(i), i+1);
+        if (CyclopsCanvas::canvasList[i]->realIndex != closingCanvas->realIndex){
+            canvasCombo->addItem("Cyclops" + String(CyclopsCanvas::canvasList[i]->realIndex), i+1);
         }
     }
     addAndMakeVisible(canvasCombo);
+    canvasCombo->addListener(this);
 
     doneButton = new UtilityButton("DONE", Font("Default", 12, Font::plain));
     doneButton->addListener(this);
+    doneButton->setEnabled(false);
     cancelButton = new UtilityButton("CANCEL", Font("Default", 12, Font::plain));
     cancelButton->addListener(this);
     addAndMakeVisible(doneButton);
     addAndMakeVisible(cancelButton);
 
-    setSize(300, 60+30+40+25*editorButtonList.size());
+    setSize(300, 60+30+40+30+25*editorButtonList.size());
 }
 
 void MigrateComponent::resized()
 {
     int width = getWidth(), height = getHeight(), i=0;
+    allEditorsButton->setBounds(width/2-200/2+10, 25, 60, 20);
     for (auto& tb : editorButtonList){
-        tb->setBounds(width/2-200/2+10, 25+i*22, 60, 20);
+        tb->setBounds(width/2-200/2+10, 25+30+i*22, 60, 20);
         i++;
     }
-    group->setBounds(width/2-200/2, 10, 200, 25*(i)+20);
+    group->setBounds(width/2-200/2, 10, 200, 25+30*(i)+20);
     comboText->setBounds(width/2-100/2, height-100, 100, 25);
     canvasCombo->setBounds(width/2-90/2, height-70, 90, 25);
     doneButton->setBounds((width-80*2)/3, height-30, 80, 25);
@@ -618,21 +682,57 @@ void MigrateComponent::resized()
 
 void MigrateComponent::buttonClicked(Button* button)
 {
-    if (button == doneButton){
+    if (button == doneButton) {
         CyclopsCanvas *newCanvas = CyclopsCanvas::canvasList.getUnchecked(canvasCombo->getSelectedId()-1);
-        for (int& editorId : editorIdList){
+        for (int i=0; i<editorIdList.size(); i++){
             // this will changeCanvas and update SelectorButtons of src->listeners only
-            jassert (CyclopsCanvas::migrateEditor(newCanvas, closingCanvas, editorId) == 0);
+            if (editorButtonList[i]->getToggleState()){
+                jassert(CyclopsCanvas::migrateEditor(newCanvas, closingCanvas, editorIdList[i]) == 0);
+            }
+            else{
+                CyclopsCanvas::dropEditor(closingCanvas, editorIdList[i]);
+            }
         }
         newCanvas->refresh();
-        closingCanvas->refresh();
+        // remove tab if open
+        // remove window if open
+        // tell all that they need to update combo-list
+        CyclopsCanvas::canvasList.removeObject(closingCanvas, true);
+        for (auto& canvas : CyclopsCanvas::canvasList){
+            canvas->broadcastButtonState(CanvasEvent::COMBO_BUTTON, true);
+        }
+        closeWindow();
     }
+    else if (button == cancelButton) {
+        closeWindow();
+    }
+    else if ( button == allEditorsButton) {
+        for (auto& editorButton : editorButtonList){
+            editorButton->setToggleState(true, dontSendNotification);
+        }
+    }
+    // must be one in editorButtonList, do nothing for that (except maybe
+    // 'highlight" in  EditorViewport?)
+    else {
+        allEditorsButton->setToggleState(false, dontSendNotification);
+    }
+    
+}
+
+void MigrateComponent::comboBoxChanged(ComboBox* cb)
+{
+    if (cb == canvasCombo){
+        doneButton->setEnabled(true);
+    }
+}
+
+void MigrateComponent::closeWindow()
+{
     for (auto& canvas : CyclopsCanvas::canvasList){
+        canvas->broadcastButtonState(CanvasEvent::COMBO_BUTTON, true);
         canvas->enableAllInputWidgets();
         canvas->broadcastEditorInteractivity(CanvasEvent::THAW);
     }
-    // now update all comboBoxes -- ALL!
-    // ??
     
     if (DialogWindow* dw = findParentComponentOfClass<DialogWindow>())
         dw->exitModalState(0);

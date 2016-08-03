@@ -96,7 +96,6 @@ public:
     void updateSettings();
     
     void updateIndicators(CanvasEvent LEDtype);
-    void canvasClosing(CyclopsCanvas* newParentCanvas, CanvasEvent transferMode);
     void changeCanvas(CyclopsCanvas* dest);
     void refreshPluginInfo();
     void updateButtons(CanvasEvent whichButton, bool state);
@@ -115,9 +114,12 @@ private:
     ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
     CyclopsProcessor* processor;         /**< Parent Processor node */
     ScopedPointer<Label> comboText;
+    ScopedPointer<Label> myID;           /**< The Processor ID provided by OE core */
 
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
+
+    bool isAlive;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsEditor);
 };

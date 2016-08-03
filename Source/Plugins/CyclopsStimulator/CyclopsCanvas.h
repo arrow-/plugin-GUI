@@ -30,17 +30,20 @@
 #include <SerialLib.h>
 #include <string>
 
+#include "plugin_manager/CyclopsPlugin.h"
+
 namespace cyclops {
 
 enum class CanvasEvent{
     WINDOW_BUTTON,
     TAB_BUTTON,
+    COMBO_BUTTON,
     SERIAL_LED,
     READY_LED,
     TRANSFER_DROP,
     TRANSFER_MIGRATE,
     FREEZE,
-    THAW
+    THAW,
 };
 
 struct cl_serial
@@ -57,6 +60,7 @@ struct cl_serial
     }
 };
 
+class HookInfo;
 class HookView;
 class HookViewDisplay;
 class HookViewport;
@@ -73,7 +77,6 @@ public:
     class Listener{
     public:
         virtual void updateIndicators(CanvasEvent LEDtype) = 0;
-        virtual void canvasClosing(CyclopsCanvas* newParentCanvas, CanvasEvent transferMode) = 0;
         virtual void refreshPluginInfo() = 0;
         virtual void changeCanvas(CyclopsCanvas* dest) = 0;
         virtual void updateButtons(CanvasEvent whichButton, bool state) = 0;
@@ -158,6 +161,23 @@ public:
 
     void addListener(Listener* newListener);
     void removeListener(Listener* oldListener);
+
+    /**
+     * @brief      Adds a _new_ HookView object into the static hookViews array.
+     *
+     * @param[in]  node_id  The node identifier
+     */
+    void addHook(int node_id);
+
+    /**
+     * @brief      Removes the HookView from the static hookVIews array
+     *
+     * @param[in]  node_id  The node identifier
+     *
+     * @return     ``true`` if an element was removed, ``false`` otherwise.
+     */
+    bool removeHook(int node_id);
+
     void broadcastButtonState(CanvasEvent whichButton, bool state);
     void broadcastEditorInteractivity(CanvasEvent interactivity);
     int  getNumListeners();
@@ -168,15 +188,29 @@ public:
     /** Loads parameters from XML */
     virtual void loadVisualizerParameters(XmlElement* xml);
 
+    /**
+     * @brief      Gets the editor identifiers.
+     *
+     * @param      cc            { parameter_description }
+     * @param      editorIdList  The editor identifier list
+     */
+
+    static void broadcastNewCanvas();
     static int getNumCanvas();
     static void getEditorIds(CyclopsCanvas* cc, Array<int>& editorIdList);
+    static HookView* getHookView(int node_id);
+    static void dropEditor(CyclopsCanvas* closingCanvas, int node_id);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow=true);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId);
     
     static OwnedArray<CyclopsCanvas> canvasList;
+    static OwnedArray<HookView> hookViews;
 
-    int tabIndex;
-    int realIndex;
+    int tabIndex;  /** < This is used for VisualizerEditor, don't try to use this
+                    * variable, unless absolutely sure that you understand it's
+                    * purpose. This does not appear on the tab. */
+    int realIndex; /** < This is the "real" name of the Canvas, which appears on the
+                    * tab, dropwdowns, etc. */
     ScopedPointer<DataWindow> dataWindow;
 
 private:
@@ -203,6 +237,7 @@ private:
     ListenerList<Listener> canvasEventListeners;
 
     static const int BAUDRATES[12];
+    static int numCanvases;
 
     /**
      * @brief      Filters only relevant serial ports (by name).
@@ -221,9 +256,8 @@ private:
      * @brief      Returns a list of all supported baudrates.
      */
     Array<int> getBaudrates();
-    void updateHookViews();
-
-    static CyclopsCanvas::Listener* findById(CyclopsCanvas* cc, int nodeId);
+    
+    static CyclopsCanvas::Listener* findListenerById(CyclopsCanvas* cc, int nodeId);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsCanvas);
 };
@@ -255,14 +289,34 @@ class HookViewDisplay : public Component
 {
 public:
     HookViewDisplay(CyclopsCanvas* _canvas);
+    void addView(HookView* hv);
+    void removeView(int node_id);
     void paint(Graphics& g);
     void refresh();
     void resized();
 
     Array<int> shownIds;
-    OwnedArray<HookView> hookViews;
     CyclopsCanvas* canvas;
 };
+
+
+
+
+
+
+
+
+
+
+
+class HookInfo{
+public:
+    int nodeId;
+    CyclopsPlugin* plugin;
+    HookInfo(int node_id);
+};
+
+
 
 
 
@@ -273,8 +327,10 @@ class HookView : public Component
 public:
     int nodeId;
     ScopedPointer<Label> hookIdLabel;
+    ScopedPointer<HookInfo> hookInfo;
 
     HookView(int node_id);
+    void refresh();
     void paint(Graphics& g);
     void resized();
 };
@@ -286,23 +342,35 @@ public:
 
 
 
+
+
+
+
+
+
+
 class MigrateComponent : public Component
                        , public Button::Listener
+                       , public ComboBox::Listener
 {
 public:
     MigrateComponent(CyclopsCanvas* closing_canvas);
     void resized();
     void buttonClicked(Button* button);
+    void comboBoxChanged(ComboBox* cb);
 
 private:
     CyclopsCanvas* closingCanvas;
     Array<int> editorIdList;
     ScopedPointer<GroupComponent> group;
+    ScopedPointer<ToggleButton> allEditorsButton;
     OwnedArray<ToggleButton> editorButtonList;
     ScopedPointer<Label> comboText;
     ScopedPointer<ComboBox> canvasCombo;
     ScopedPointer<UtilityButton> doneButton;
     ScopedPointer<UtilityButton> cancelButton;
+
+    void closeWindow();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MigrateComponent);
 };
