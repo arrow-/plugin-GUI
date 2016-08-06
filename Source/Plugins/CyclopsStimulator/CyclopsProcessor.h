@@ -82,6 +82,8 @@ public:
 private:
     
     cl_serial* serialInfo;
+    CyclopsPluginInfo* pluginInfo;
+    CyclopsPlugin* plugin;
     static int node_count;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsProcessor);

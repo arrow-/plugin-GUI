@@ -40,11 +40,6 @@ CyclopsProcessor::~CyclopsProcessor()
     //std::cout<<"deleting clproc"<<std::endl;
 }
 
-void CyclopsProcessor::updateSettings()
-{
-    ;
-}
-
 /**
     If the processor uses a custom editor, this method must be present.
 */
@@ -56,11 +51,6 @@ AudioProcessorEditor* CyclopsProcessor::createEditor()
 
 void CyclopsProcessor::setParameter(int parameterIndex, float newValue)
 {
-
-    //Parameter& p =  parameters.getReference(parameterIndex);
-    //p.setValue(newValue, 0);
-    //threshold = newValue;
-    //std::cout << float(p[0]) << std::endl;
     editor->updateParameterButtons(parameterIndex);
 }
 
@@ -72,29 +62,43 @@ void CyclopsProcessor::process(AudioSampleBuffer& buffer,
 
 void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int samplePosition/* = 0 */)
 {
-    ;    
+    // std::cout << eventType << " " << std::endl;
+    plugin->handleEvent(eventType, event, samplePosition);
 }
 
 bool CyclopsProcessor::isReady()
 {
-    if (!dynamic_cast<CyclopsEditor*>(editor.get())->isReady())
+    CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
+    if (!cl_editor->isReady())
     {
         editor->makeVisible();
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Prepare this hook", "Please configure this Cyclops Stimulator-hook correctly!");
+        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Prepare this hook", "Please configure this (" + String(nodeId) + ") Cyclops Stimulator-hook correctly!");
         return false;
     }
     return true;
 }
 
+void CyclopsProcessor::updateSettings()
+{
+    
+}
+
 bool CyclopsProcessor::enable()
 {
-    //Serial->close();
+    CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
+    pluginInfo = cl_editor->refreshPluginInfo();
+    serialInfo = cl_editor->getSerial();
+    plugin = pluginInfo->CyclopsPluginFactory();
+    if (pluginInfo == nullptr || plugin == nullptr || serialInfo == nullptr)
+        return false;
+    std::cout << "Name: " << pluginInfo->Name << std::endl;
+    std::cout << "sources: " << pluginInfo->sourceCount << std::endl;
+    std::cout << "channels: " << pluginInfo->channelCount << std::endl;
     return true;
 }
 
 bool CyclopsProcessor::disable()
 {
-    //Serial->close();
     return true;
 }
 

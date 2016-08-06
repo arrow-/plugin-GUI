@@ -107,14 +107,14 @@ CyclopsCanvas::~CyclopsCanvas()
 void CyclopsCanvas::beginAnimation()
 {
     std::cout << "CyclopsCanvas beginning animation." << std::endl;
-
+    disableAllInputWidgets();
     startCallbacks();
 }
 
 void CyclopsCanvas::endAnimation()
 {
     std::cout << "CyclopsCanvas ending animation." << std::endl;
-
+    enableAllInputWidgets();
     stopCallbacks();
 }
 
@@ -225,6 +225,7 @@ void CyclopsCanvas::disableAllInputWidgets()
     portCombo->setEnabled(false);
     baudrateCombo->setEnabled(false);
     refreshButton->setEnabled(false);
+    hookViewDisplay->disableAllInputWidgets();
 }
 
 void CyclopsCanvas::enableAllInputWidgets()
@@ -235,11 +236,12 @@ void CyclopsCanvas::enableAllInputWidgets()
     portCombo->setEnabled(true);
     baudrateCombo->setEnabled(true);
     refreshButton->setEnabled(true);
+    hookViewDisplay->enableAllInputWidgets();
 }
 
 bool CyclopsCanvas::isReady()
 {
-    return true;
+    return hookViewDisplay->isReady() && serialInfo.portName != "";
 }
 
 void CyclopsCanvas::paint(Graphics& g)
@@ -372,6 +374,15 @@ Array<int> CyclopsCanvas::getBaudrates()
     return allBaudrates;
 }
 
+CyclopsPluginInfo* CyclopsCanvas::getPluginInfoById(int node_id)
+{
+    HookView* hv = getHookView(node_id);
+    if (hv != nullptr){
+        return hv->hookInfo->pluginInfo;
+    }
+    return nullptr;
+}
+
 void CyclopsCanvas::setDevice(string port)
 {
     serialInfo.portName = port;
@@ -433,6 +444,12 @@ HookView* CyclopsCanvas::getHookView(int node_id)
     return res;
 }
 
+bool CyclopsCanvas::isReady(int node_id)
+{
+    HookView* hv = CyclopsCanvas::getHookView(node_id);
+    return hv->isReady();
+}
+
 void CyclopsCanvas::broadcastButtonState(CanvasEvent whichButton, bool state)
 {
     canvasEventListeners.call(&CyclopsCanvas::Listener::updateButtons, whichButton, state);
@@ -441,6 +458,18 @@ void CyclopsCanvas::broadcastButtonState(CanvasEvent whichButton, bool state)
 void CyclopsCanvas::broadcastEditorInteractivity(CanvasEvent interactivity)
 {
     canvasEventListeners.call(&CyclopsCanvas::Listener::setInteractivity, interactivity);
+}
+
+void CyclopsCanvas::unicastPluginIndicator(CanvasEvent pluginState, int node_id)
+{
+    CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
+    listener->updateIndicators(CanvasEvent::PLUGIN_SELECTED);
+}
+
+void CyclopsCanvas::unicastUpdatePluginInfo(int node_id)
+{
+    CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
+    listener->refreshPluginInfo();
 }
 
 void CyclopsCanvas::broadcastNewCanvas()
@@ -563,9 +592,31 @@ void HookViewDisplay::resized()
     }
 }
 
+bool HookViewDisplay::isReady()
+{
+    for (int i=0; i<shownIds.size(); i++){
+        HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
+        if (!hv->isReady())
+            return false;
+    }
+    return true;
+}
 
+void HookViewDisplay::disableAllInputWidgets()
+{
+    for (int i=0; i<shownIds.size(); i++){
+        HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
+        hv->disableAllInputWidgets();
+    }
+}
 
-
+void HookViewDisplay::enableAllInputWidgets()
+{
+    for (int i=0; i<shownIds.size(); i++){
+        HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
+        hv->enableAllInputWidgets();
+    }
+}
 
 
 
@@ -591,8 +642,8 @@ HookView::HookView(int node_id) : nodeId(node_id)
     CyclopsCanvas::pluginManager->getPluginNames(nameList);
     pluginSelect->addItemList(nameList, 1);
     pluginSelect->setTextWhenNothingSelected("Choose");
+    pluginSelect->addListener(this);
     addAndMakeVisible(pluginSelect);
-
 
     hookInfo = new HookInfo(nodeId);
     setSize(80, 45);
@@ -600,7 +651,12 @@ HookView::HookView(int node_id) : nodeId(node_id)
 
 void HookView::comboBoxChanged(ComboBox* cb)
 {
-
+    HookViewDisplay* parent = findParentComponentOfClass<HookViewDisplay>();
+    parent->canvas->unicastPluginIndicator(CanvasEvent::PLUGIN_SELECTED, nodeId);
+    parent->canvas->unicastUpdatePluginInfo(nodeId);
+    std::cout << cb->getSelectedItemIndex() <<std::endl;
+    String name = cb->getItemText(cb->getSelectedItemIndex());
+    hookInfo->pluginInfo = CyclopsCanvas::pluginManager->getInfo(name.toStdString());
 }
 
 void HookView::paint(Graphics& g)
@@ -620,6 +676,22 @@ void HookView::refresh()
     repaint();
 }
 
+bool HookView::isReady()
+{
+    if (hookInfo->pluginInfo == nullptr)
+        return false;
+    return true;
+}
+
+void HookView::disableAllInputWidgets()
+{
+    pluginSelect->setEnabled(false);
+}
+
+void HookView::enableAllInputWidgets()
+{
+    pluginSelect->setEnabled(true);
+}
 
 
 
@@ -628,10 +700,7 @@ void HookView::refresh()
 
 
 
-
-
-
-HookInfo::HookInfo(int node_id) : nodeId(node_id), plugin(nullptr) {}
+HookInfo::HookInfo(int node_id) : nodeId(node_id), pluginInfo(nullptr) {}
 
 
 

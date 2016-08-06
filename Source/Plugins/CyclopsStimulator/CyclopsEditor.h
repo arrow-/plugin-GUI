@@ -83,6 +83,7 @@ public:
     void enableAllInputWidgets();
 
     bool isReady();
+    bool isSerialConnected();
 
     /** Called to inform the editor that acquisition is about to start*/
     void startAcquisition();
@@ -97,10 +98,12 @@ public:
     
     void updateIndicators(CanvasEvent LEDtype);
     void changeCanvas(CyclopsCanvas* dest);
-    void refreshPluginInfo();
+    CyclopsPluginInfo* refreshPluginInfo();
     void updateButtons(CanvasEvent whichButton, bool state);
     void setInteractivity(CanvasEvent interactivity);
     int  getEditorId();
+
+    cl_serial* getSerial();
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);

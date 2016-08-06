@@ -2,10 +2,10 @@
 
 Example_CL_Plugin::Example_CL_Plugin()
 {
-    std::cout << "Yo" << std::endl;
+    std::cout << "Creating Example_CL_Plugin" << std::endl;
 }
 
 void Example_CL_Plugin::handleEvent(int eventType, MidiMessage& event, int samplePosition/* = 0 */)
 {
-    ;
+
 }

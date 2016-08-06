@@ -6,7 +6,7 @@ namespace cyclops
 
 CyclopsPlugin::CyclopsPlugin() : readiness(0)
 {
-    std::cout<<"Made";
+
 }
 
 void CyclopsPlugin::setChannels(const int channelIDs[]){

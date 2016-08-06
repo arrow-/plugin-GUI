@@ -278,18 +278,26 @@ void CyclopsEditor::enableAllInputWidgets()
 
 bool CyclopsEditor::isReady()
 {
-    return isAlive && connectedCanvas->isReady();
+    return isAlive && CyclopsCanvas::isReady(nodeId);
+}
+
+bool CyclopsEditor::isSerialConnected()
+{
+    const cl_serial* serial = connectedCanvas->getSerialInfo();
+    return (serial->portName == "");
 }
 
 void CyclopsEditor::startAcquisition()
 {
     disableAllInputWidgets();
+    connectedCanvas->beginAnimation();
     GenericEditor::startAcquisition();
 }
 
 void CyclopsEditor::stopAcquisition()
 {
     enableAllInputWidgets();
+    connectedCanvas->endAnimation();
     GenericEditor::stopAcquisition();
 }
 
@@ -305,16 +313,17 @@ void CyclopsEditor::updateIndicators(CanvasEvent event)
         serialLED->update(Colours::black, "Invalid State");
         readinessLED->update(Colours::black, "Invalid State");
     }
-    else{
-        const cl_serial* serial = connectedCanvas->getSerialInfo();
-        if (serial->portName == "")
+    else if (event == CanvasEvent::SERIAL_LED){
+        if (isSerialConnected())
             serialLED->update(CyclopsColours::disconnected, "Not Connected");
         else
             serialLED->update(CyclopsColours::connected, "Connected");
     }
+    else if (event == CanvasEvent::PLUGIN_SELECTED){
+        readinessLED->update(CyclopsColours::Ready, "Just fill the channel mux here.");
+    }
     serialLED->repaint();
     readinessLED->repaint();
-    // update the LED
 }
 
 void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
@@ -328,9 +337,9 @@ void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
     }
 }
 
-void CyclopsEditor::refreshPluginInfo()
+CyclopsPluginInfo* CyclopsEditor::refreshPluginInfo()
 {
-    // connectedCanvas->getPluginInfoForHookID(hook_id);
+    return connectedCanvas->getPluginInfoById(nodeId);
 }
 
 void CyclopsEditor::updateButtons(CanvasEvent whichButton, bool state)
@@ -374,6 +383,11 @@ void CyclopsEditor::setInteractivity(CanvasEvent interactivity)
 int CyclopsEditor::getEditorId()
 {
     return nodeId;
+}
+
+cl_serial* CyclopsEditor::getSerial()
+{
+    return &(connectedCanvas->serialInfo);
 }
 
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)

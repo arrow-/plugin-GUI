@@ -39,7 +39,7 @@ enum class CanvasEvent{
     TAB_BUTTON,
     COMBO_BUTTON,
     SERIAL_LED,
-    READY_LED,
+    PLUGIN_SELECTED,
     TRANSFER_DROP,
     TRANSFER_MIGRATE,
     FREEZE,
@@ -77,26 +77,13 @@ public:
     class Listener{
     public:
         virtual void updateIndicators(CanvasEvent LEDtype) = 0;
-        virtual void refreshPluginInfo() = 0;
+        virtual CyclopsPluginInfo* refreshPluginInfo() = 0;
         virtual void changeCanvas(CyclopsCanvas* dest) = 0;
         virtual void updateButtons(CanvasEvent whichButton, bool state) = 0;
         virtual void setInteractivity(CanvasEvent interactivity) = 0;
         virtual int  getEditorId() = 0;
     };
 
-/*
-    class boofoo : public Component{
-    public:
-
-        boofoo(){
-            butt = new UtilityButton("lol", Font("Default", 8, Font::plain));
-            addAndMakeVisible(butt);
-        }
-        void paint(Graphics& g){g.fillAll(Colours::green);}
-        void resized() {butt->setBounds(getWidth()/2, 0, 10, 8);}
-    private:
-        ScopedPointer<UtilityButton> butt;
-    };*/
     CyclopsCanvas();
     void refreshPlugins();
     ~CyclopsCanvas();
@@ -151,6 +138,7 @@ public:
 
     void timerCallback();
 
+    CyclopsPluginInfo* getPluginInfoById(int node_id);
     /** Setter, that allows you to set the serial device that will be used during acquisition */
     void setDevice(string device);
 
@@ -170,7 +158,7 @@ public:
     void addHook(int node_id);
 
     /**
-     * @brief      Removes the HookView from the static hookVIews array
+     * @brief      Removes the HookView from the static hookViews array
      *
      * @param[in]  node_id  The node identifier
      *
@@ -180,6 +168,8 @@ public:
 
     void broadcastButtonState(CanvasEvent whichButton, bool state);
     void broadcastEditorInteractivity(CanvasEvent interactivity);
+    void unicastPluginIndicator(CanvasEvent pluginState, int node_id);
+    void unicastUpdatePluginInfo(int node_id);
     int  getNumListeners();
 
     /** Saves parameters as XML */
@@ -202,6 +192,7 @@ public:
     static void dropEditor(CyclopsCanvas* closingCanvas, int node_id);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow=true);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId);
+    static bool isReady(int node_id);
     
     static ScopedPointer<CyclopsPluginManager> pluginManager;
     static OwnedArray<CyclopsCanvas> canvasList;
@@ -213,6 +204,8 @@ public:
     int realIndex; /** < This is the "real" name of the Canvas, which appears on the
                     * tab, dropwdowns, etc. */
     ScopedPointer<DataWindow> dataWindow;
+    // serial object
+    cl_serial serialInfo;
 
 private:
     
@@ -232,8 +225,6 @@ private:
     double progress, pstep;
     bool in_a_test;
 
-    // serial object
-    cl_serial serialInfo;
     // listeners
     ListenerList<Listener> canvasEventListeners;
 
@@ -295,6 +286,9 @@ public:
     void paint(Graphics& g);
     void refresh();
     void resized();
+    bool isReady();
+    void disableAllInputWidgets();
+    void enableAllInputWidgets();
 
     Array<int> shownIds;
     CyclopsCanvas* canvas;
@@ -313,7 +307,7 @@ public:
 class HookInfo{
 public:
     int nodeId;
-    CyclopsPlugin* plugin;
+    CyclopsPluginInfo* pluginInfo;
     HookInfo(int node_id);
 };
 
@@ -337,6 +331,9 @@ public:
     void refresh();
     void paint(Graphics& g);
     void resized();
+    bool isReady();
+    void disableAllInputWidgets();
+    void enableAllInputWidgets();
 };
 
 
