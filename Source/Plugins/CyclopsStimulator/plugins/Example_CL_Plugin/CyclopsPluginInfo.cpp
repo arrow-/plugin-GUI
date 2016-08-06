@@ -33,5 +33,7 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     infoStruct.sourceCount = 4; // The no. of Sources needed on the Teensy, should be same as length of the vector below.
     infoStruct.sourceCodeNames = {"FastSquare", "SlowSquare", "Triangle", "Sawtooth"}; // this will copy, so it's safe.
     infoStruct.CyclopsPluginFactory = maker_function;
+
+    infoStruct.timePeriod = 250; // 250 ms
 }
 

@@ -284,7 +284,7 @@ bool CyclopsEditor::isReady()
 bool CyclopsEditor::isSerialConnected()
 {
     const cl_serial* serial = connectedCanvas->getSerialInfo();
-    return (serial->portName == "");
+    return !(serial->portName == "");
 }
 
 void CyclopsEditor::startAcquisition()
@@ -315,9 +315,9 @@ void CyclopsEditor::updateIndicators(CanvasEvent event)
     }
     else if (event == CanvasEvent::SERIAL_LED){
         if (isSerialConnected())
-            serialLED->update(CyclopsColours::disconnected, "Not Connected");
-        else
             serialLED->update(CyclopsColours::connected, "Connected");
+        else
+            serialLED->update(CyclopsColours::disconnected, "Not Connected");
     }
     else if (event == CanvasEvent::PLUGIN_SELECTED){
         readinessLED->update(CyclopsColours::Ready, "Just fill the channel mux here.");

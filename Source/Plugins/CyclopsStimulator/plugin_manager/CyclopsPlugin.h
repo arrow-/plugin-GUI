@@ -97,6 +97,13 @@ public:
      * @param[in]  samplePosition  The sample position
      */
     virtual void handleEvent(int eventType, MidiMessage& event, int samplePosition = 0) = 0;
+
+    /**
+     * @brief      This is where your CL-plugin can do periodic tasks. You
+     *             cannot change the timer period or stop it (as of now?).
+     * @note       The time period can be set in CyclopsPluginInfo.cpp
+     */
+    virtual void timerTask() = 0;
 };
 
 } // NAMESPACE cyclops

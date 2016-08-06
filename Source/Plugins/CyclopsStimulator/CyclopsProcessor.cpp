@@ -28,8 +28,8 @@ namespace cyclops {
 
 int CyclopsProcessor::node_count = 0;
 
-CyclopsProcessor::CyclopsProcessor()
-    : GenericProcessor("Cyclops Stimulator")
+CyclopsProcessor::CyclopsProcessor() : GenericProcessor("Cyclops Stimulator")
+                                     , isParticipating(false)
 {
     node_count++;
 }
@@ -57,25 +57,29 @@ void CyclopsProcessor::setParameter(int parameterIndex, float newValue)
 void CyclopsProcessor::process(AudioSampleBuffer& buffer,
                                MidiBuffer& events)
 {
-    checkForEvents(events);
+    if (isParticipating)
+        checkForEvents(events);
 }
 
 void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int samplePosition/* = 0 */)
 {
-    // std::cout << eventType << " " << std::endl;
     plugin->handleEvent(eventType, event, samplePosition);
 }
 
 bool CyclopsProcessor::isReady()
 {
     CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
-    if (!cl_editor->isReady())
-    {
+    if (!cl_editor->isReady()){
         editor->makeVisible();
         AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Prepare this hook", "Please configure this (" + String(nodeId) + ") Cyclops Stimulator-hook correctly!");
         return false;
     }
     return true;
+}
+
+void CyclopsProcessor::timerCallback()
+{
+    plugin->timerTask();
 }
 
 void CyclopsProcessor::updateSettings()
@@ -91,14 +95,20 @@ bool CyclopsProcessor::enable()
     plugin = pluginInfo->CyclopsPluginFactory();
     if (pluginInfo == nullptr || plugin == nullptr || serialInfo == nullptr)
         return false;
-    std::cout << "Name: " << pluginInfo->Name << std::endl;
-    std::cout << "sources: " << pluginInfo->sourceCount << std::endl;
-    std::cout << "channels: " << pluginInfo->channelCount << std::endl;
+    std::cout << "Name     : " << pluginInfo->Name << std::endl;
+    std::cout << "sources  : " << pluginInfo->sourceCount << std::endl;
+    std::cout << "channels : " << pluginInfo->channelCount << std::endl;
+    if (cl_editor->isSerialConnected()){
+        startTimer(pluginInfo->timePeriod);
+        isParticipating = true;
+    }
     return true;
 }
 
 bool CyclopsProcessor::disable()
 {
+    stopTimer();
+    isParticipating = false;
     return true;
 }
 

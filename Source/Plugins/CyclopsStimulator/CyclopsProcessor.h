@@ -44,7 +44,7 @@ struct cl_serial;
   @see GenericProcessor
 */
 class CyclopsProcessor : public GenericProcessor
-
+                       , public Timer
 {
 public:
 
@@ -69,8 +69,12 @@ public:
     AudioProcessorEditor* createEditor();
 
     bool isReady();
+    
+    void timerCallback();
+
     void process(AudioSampleBuffer& buffer, MidiBuffer& events);
     void handleEvent(int eventType, MidiMessage& event, int samplePosition = 0);
+    
     void setParameter(int parameterIndex, float newValue);
     void updateSettings();
 
@@ -80,10 +84,13 @@ public:
     static int getProcessorCount();
 
 private:
-    
+
     cl_serial* serialInfo;
     CyclopsPluginInfo* pluginInfo;
     CyclopsPlugin* plugin;
+
+    bool isParticipating;
+    
     static int node_count;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsProcessor);

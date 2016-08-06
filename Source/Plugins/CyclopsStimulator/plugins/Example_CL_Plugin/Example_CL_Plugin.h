@@ -16,7 +16,7 @@ enum class sourceAlias : int
     Triangle,
     Sawtooth
 };
-/*
+/* NOTE for ^^^^^
  * You must keep the names in same order as that in source_code_names. Then you
  * can use the enum to refer to the correct object instead of using interger
  * index literals, making your code easier to read and modify.
@@ -26,8 +26,12 @@ enum class sourceAlias : int
 class Example_CL_Plugin : public cyclops::CyclopsPlugin
 {
 public:
+    int count;
+    int secret;
+
     Example_CL_Plugin();
     void handleEvent(int eventType, MidiMessage& event, int samplePosition = 0);
+    void timerTask();
 };
 
 #endif
