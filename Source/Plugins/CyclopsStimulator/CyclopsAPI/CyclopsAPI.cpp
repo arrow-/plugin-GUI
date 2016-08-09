@@ -23,23 +23,70 @@ inline static uint8_t getMultiByteHeader (int _channel)
   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
 */
 
+
+
+
+
+
+
+
+OwnedArray<CyclopsSignal> CyclopsSignal::signals;
+
+bool CyclopsSignal::read(std::ifstream& file)
+{
+    try{
+        file >> type >> name >> size;
+        for (int i=0; i<size; i++){
+            int timeVal;
+            file >> timeVal;
+            holdTime.add(timeVal);
+        }
+        for (int i=0; i<size; i++){
+            int voltageVal;
+            file >> voltageVal;
+            voltage.add(voltageVal);
+        }
+        return true;
+    }
+    catch (std::ifstream::failure e){
+        return false;
+    }
+}
+
+void CyclopsSignal::readSignals(std::ifstream& inFile)
+{
+    inFile.exceptions(std::ifstream::eofbit);
+    while (true){
+        CyclopsSignal *cs = new CyclopsSignal();
+        if (cs->read(inFile))
+            CyclopsSignal::signals.add(cs);
+        else
+            break;
+    }
+}
+
+
+
+
+
+
 bool start (CyclopsRPC *rpc, const int *channels, int channelCount)
 {
-    rpc->message[0] = getSingleByteHeader(channels, channelCount) | START;
+    rpc->message[0] = getSingleByteHeader(channels, channelCount) | CL_SB_START;
     rpc->length = 1;
     return true;
 }
 
 bool stop (CyclopsRPC *rpc, const int *channels, int channelCount)
 {
-    rpc->message[0] = getSingleByteHeader(channels, channelCount) | STOP;
+    rpc->message[0] = getSingleByteHeader(channels, channelCount) | CL_SB_STOP;
     rpc->length = 1;
     return true;
 }
 
 bool reset (CyclopsRPC *rpc, const int *channels, int channelCount)
 {
-    rpc->message[0] = getSingleByteHeader(channels, channelCount) | RESET;
+    rpc->message[0] = getSingleByteHeader(channels, channelCount) | CL_SB_RESET;
     rpc->length = 1;
     return true;
 }
@@ -47,14 +94,28 @@ bool reset (CyclopsRPC *rpc, const int *channels, int channelCount)
 bool swap (CyclopsRPC *rpc, int c1, int c2)
 {
     int ch[] = {c1, c2};
-    rpc->message[0] = getSingleByteHeader(ch, 2) | SWAP;
+    rpc->message[0] = getSingleByteHeader(ch, 2) | CL_SB_SWAP;
+    rpc->length = 1;
+    return true;
+}
+
+bool launch (CyclopsRPC *rpc)
+{
+    rpc->message[0] = CL_SB_LAUNCH | (1 << 7);
+    rpc->length = 1;
+    return true;
+}
+
+bool end (CyclopsRPC *rpc)
+{
+    rpc->message[0] = CL_SB_END | (1 << 7);
     rpc->length = 1;
     return true;
 }
 
 bool identify (CyclopsRPC *rpc)
 {
-    rpc->message[0] = IDENTITY;
+    rpc->message[0] = CL_SB_IDENTITY | (1 << 7);
     rpc->length = 1;
     return true;
 }

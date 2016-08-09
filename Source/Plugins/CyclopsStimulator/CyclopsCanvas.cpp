@@ -58,6 +58,9 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     baudrateCombo->addListener(this);
     baudrateCombo->setTooltip("Set the baud rate (115200 recommended).");
 
+    devStatus = new IndicatorLED(CyclopsColours::disconnected, Colours::black);
+    addChildComponent(devStatus);
+
     Array<int> baudrates(getBaudrates());
     for (int i = 0; i < baudrates.size(); i++)
     {
@@ -87,6 +90,10 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     hookViewport = new HookViewport(hookViewDisplay);
     addAndMakeVisible(hookViewport);
 
+    signalDisplay = new SignalDisplay(this);
+    signalViewport = new SignalViewport(signalDisplay);
+    addAndMakeVisible(signalViewport);
+
     refreshPlugins();
 }
 
@@ -108,14 +115,21 @@ void CyclopsCanvas::beginAnimation()
 {
     std::cout << "CyclopsCanvas beginning animation." << std::endl;
     disableAllInputWidgets();
-    startCallbacks();
+    if (serialInfo.portName != ""){
+        // serialInfo->Serial.writeByte(<launch>);
+        devStatus->update(CyclopsColours::connected, "Device is in sync!");
+        devStatus->setVisible(true);
+        devStatus->repaint();
+    }
+    startTimer(40);
 }
 
 void CyclopsCanvas::endAnimation()
 {
     std::cout << "CyclopsCanvas ending animation." << std::endl;
     enableAllInputWidgets();
-    stopCallbacks();
+    devStatus->setVisible(false);
+    stopTimer();
 }
 
 void CyclopsCanvas::setParameter(int x, float f)
@@ -151,11 +165,17 @@ void CyclopsCanvas::resized()
     progressBar->setBounds(2, height-16, width-4, 16);
     closeButton->setBounds(width/2-20, 5, 40, 20);
 
-    hookViewport->setBounds(2, 50, width-100, height-50);
+    hookViewport->setBounds(2, 50, width-100, height/2-30);
     hookViewDisplay->setBounds( 0
                               , 0
                               , width-100-hookViewport->getScrollBarThickness()
                               , 40+50*canvasEventListeners.size());
+
+    signalViewport->setBounds(2, 50+10+height/2-30, width-100, height/2-30);
+    signalDisplay->setBounds( 0
+                            , 0
+                            , width-100-signalViewport->getScrollBarThickness()
+                            , 20+18*CyclopsSignal::signals.size());
 }
 
 int CyclopsCanvas::getNumCanvas()
@@ -246,7 +266,7 @@ bool CyclopsCanvas::isReady()
 
 void CyclopsCanvas::paint(Graphics& g)
 {
-    g.fillAll(Colours::darkgrey);
+    g.fillAll(Colour(0xff6e6e6e));
     if (!in_a_test)
         progressBar->setVisible(false);
     if (canvasList.size() > 1)
@@ -264,6 +284,7 @@ void CyclopsCanvas::buttonClicked(Button* button)
     }
     if (test_index >= 0){
         disableAllInputWidgets();
+        broadcastEditorInteractivity(CanvasEvent::FREEZE);
         std::cout << "Testing LED channel " << test_index << "\n";
         in_a_test = true;
         //serialInfo.Serial->testChannel(test_index);
@@ -312,12 +333,10 @@ void CyclopsCanvas::buttonClicked(Button* button)
 
 void CyclopsCanvas::comboBoxChanged(ComboBox* comboBox)
 {
-    if (comboBox == portCombo)
-    {
+    if (comboBox == portCombo){
         setDevice(comboBox->getText().toStdString());
     }
-    else if (comboBox == baudrateCombo)
-    {
+    else if (comboBox == baudrateCombo){
         setBaudrate(comboBox->getSelectedId());
     }
 }
@@ -337,6 +356,35 @@ void CyclopsCanvas::timerCallback()
             in_a_test = false;
             stopTimer();
             enableAllInputWidgets();
+            broadcastEditorInteractivity(CanvasEvent::THAW);
+        }
+    }
+    else{
+        int response;
+        while (serialInfo.Serial->available() > 0){
+            response = serialInfo.Serial->readByte();
+            switch (response){
+            case 0:   //CL_RC_LAUNCH
+            break;
+
+            case 1:   //CL_RC_END
+            break;
+
+            case 8:   //CL_RC_SBDONE
+            break;
+
+            case 9:   //CL_RC_IDENTITY
+            break;
+
+            case 16:  //CL_RC_MBDONE
+            break;
+
+            case 240: //CL_RC_EA_FAIL
+            case 241: //CL_RC_NEA_FAIL
+                devStatus->update(CyclopsColours::notResponding, "Device sent an ErrorCode.");
+                devStatus->repaint();
+            break;
+            }
         }
     }
 }
@@ -388,6 +436,23 @@ void CyclopsCanvas::setDevice(string port)
     serialInfo.portName = port;
     if (serialInfo.portName != ""){
         serialInfo.Serial->setup(serialInfo.portName, serialInfo.baudRate);
+        CyclopsRPC rpc;
+        identify(&rpc);
+        serialInfo.Serial->writeBytes(rpc.message, rpc.length);
+        
+        unsigned char identity[RPC_IDENTITY_SZ+1] = {0};
+        while (serialInfo.Serial->available() < RPC_IDENTITY_SZ);
+        serialInfo.Serial->readBytes(identity, RPC_IDENTITY_SZ);
+
+        for (int i=0; i<RPC_IDENTITY_SZ-1-14; i++)
+            std::cout << identity[i];
+        std::cout << identity[52] << identity[55] << identity[58] << identity[61] << std::endl;
+        /*
+        if (identity[52] == '0')
+        if (identity[55] == '0')
+        if (identity[58] == '0')
+        if (identity[61] == '0')
+        */
     }
     canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
 }
@@ -511,7 +576,38 @@ CyclopsCanvas::Listener* CyclopsCanvas::findListenerById(CyclopsCanvas* cc, int 
     return nullptr;
 }
 
+/*
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  |                                 INDICATOR LEDS                                |
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+*/
 
+IndicatorLED::IndicatorLED(const Colour& fill, const Colour& line)
+{
+    fillColour = fill;
+    lineColour = line;
+}
+
+void IndicatorLED::paint(Graphics& g)
+{
+    g.setColour(fillColour);
+    g.fillEllipse(1, 1, getWidth()-2, getHeight()-2);
+    g.setColour(lineColour);
+    g.drawEllipse(1, 1, getWidth()-2, getHeight()-2, 1.2);
+}
+
+void IndicatorLED::update(const Colour& fill, String tooltip)
+{
+    fillColour = fill;
+    setTooltip(tooltip);
+}
+
+void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip)
+{
+    fillColour = fill;
+    lineColour = line;
+    setTooltip(tooltip);
+}
 
 
 
@@ -536,7 +632,6 @@ HookViewport::HookViewport(HookViewDisplay* display) : hvDisplay(display)
 
 void HookViewport::visibleAreaChanged(const Rectangle<int>& newVisibleArea)
 {
-
 }
 
 void HookViewport::paint(Graphics& g)
@@ -709,6 +804,51 @@ HookInfo::HookInfo(int node_id) : nodeId(node_id), pluginInfo(nullptr) {}
 
 
 
+SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
+{
+    std::ifstream inFile("build/cyclops_plugins/signals");
+    if (inFile)
+        CyclopsSignal::readSignals(inFile);
+    else
+        jassert(false);
+    inFile.close();
+    setSize(300, CyclopsSignal::signals.size()*18 + 40);
+}
+
+void SignalDisplay::paint(Graphics& g)
+{
+    g.fillAll(Colours::cyan);
+    g.setColour(Colours::black);
+    //std::cout << getHeight() << " " << CyclopsSignal::signals.size() << std::endl;
+    for (int i=0; i<CyclopsSignal::signals.size(); i++){
+        g.drawSingleLineText(CyclopsSignal::signals[i]->name, 5, 28+18*i);
+        //std::cout << i << " " << 20+18*i << std::endl;
+    }
+}
+
+void SignalDisplay::resized()
+{
+
+}
+
+
+
+
+
+
+
+
+
+
+SignalViewport::SignalViewport(SignalDisplay* sd) : signalDisplay(sd)
+{
+    setViewedComponent(signalDisplay, false);
+    setScrollBarsShown(true, false);
+}
+
+void SignalViewport::paint(Graphics& g)
+{
+}
 
 
 

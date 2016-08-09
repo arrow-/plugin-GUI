@@ -13,19 +13,8 @@ class CyclopsPluginInfo;
   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
 */
 
-enum class operationMode
-{
-    LOOPBACK,
-    ONE_SHOT,
-    N_SHOT
-};
-
-enum class sourceType
-{
-    STORED,
-    GENERATED,
-    SQUARE
-};
+enum class operationMode;
+enum class sourceType;
 
 /**
  * @brief      A mirror of the Source Object on the teensy

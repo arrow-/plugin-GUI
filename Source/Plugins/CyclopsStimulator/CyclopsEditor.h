@@ -33,13 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 namespace cyclops{
-    namespace CyclopsColours{
-    const Colour disconnected(0xffff3823);
-    const Colour notResponding(0xffffa834);
-    const Colour connected(0xffc1d045);
-    const Colour notReady       = disconnected;
-    const Colour Ready          = connected;
-    }
 
 class CyclopsProcessor;
 class CyclopsCanvas;
@@ -125,18 +118,6 @@ private:
     bool isAlive;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsEditor);
-};
-
-class IndicatorLED : public Component
-                   , public SettableTooltipClient
-{
-public:
-    IndicatorLED (const Colour& fill, const Colour& line);
-    void paint (Graphics& g);
-    void update (const Colour& fill, String tooltip);
-    void update (const Colour& fill, const Colour& line, String tooltip);
-private:
-    Colour fillColour, lineColour;
 };
 
 } // NAMESPACE cyclops

@@ -438,37 +438,4 @@ void CyclopsEditor::updateSelectorButtons()
         windowSelector->setToggleState(false, dontSendNotification);
 }
 
-/*
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-  |                                 INDICATOR LEDS                                |
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-*/
-
-IndicatorLED::IndicatorLED(const Colour& fill, const Colour& line)
-{
-    fillColour = fill;
-    lineColour = line;
-}
-
-void IndicatorLED::paint(Graphics& g)
-{
-    g.setColour(fillColour);
-    g.fillEllipse(1, 1, getWidth()-2, getHeight()-2);
-    g.setColour(lineColour);
-    g.drawEllipse(1, 1, getWidth()-2, getHeight()-2, 1.2);
-}
-
-void IndicatorLED::update(const Colour& fill, String tooltip)
-{
-    fillColour = fill;
-    setTooltip(tooltip);
-}
-
-void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip)
-{
-    fillColour = fill;
-    lineColour = line;
-    setTooltip(tooltip);
-}
-
 } // NAMESPACE cyclops

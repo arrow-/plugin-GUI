@@ -33,6 +33,13 @@
 #include "plugin_manager/CLPluginManager.h"
 
 namespace cyclops {
+    namespace CyclopsColours{
+    const Colour disconnected(0xffff3823);
+    const Colour notResponding(0xffffa834);
+    const Colour connected(0xffc1d045);
+    const Colour notReady       = disconnected;
+    const Colour Ready          = connected;
+    }
 
 enum class CanvasEvent{
     WINDOW_BUTTON,
@@ -60,10 +67,13 @@ struct cl_serial
     }
 };
 
+class IndicatorLED;
 class HookInfo;
 class HookView;
 class HookViewDisplay;
 class HookViewport;
+class SignalDisplay;
+class SignalViewport;
 
 /**
  * @brief      Holds UI widgets for Cyclops.
@@ -120,22 +130,10 @@ public:
 
     void resized();
 
-    /** Starts the timer callbacks. */
-    //void startCallbacks();
-
-    /** Stops the timer callbacks. */
-    //void stopCallbacks();
-
-    /** Called whenever the timer is triggered. */
-    //void timerCallback();
-
-    /** Refresh rate in Hz. */
-    float refreshRate;
-
     void buttonClicked(Button* button);
     void comboBoxChanged(ComboBox* comboBox);
     bool keyPressed(const KeyPress& key);
-
+    /** Called whenever the timer is triggered. */
     void timerCallback();
 
     CyclopsPluginInfo* getPluginInfoById(int node_id);
@@ -178,15 +176,14 @@ public:
     /** Loads parameters from XML */
     virtual void loadVisualizerParameters(XmlElement* xml);
 
+    static void broadcastNewCanvas();
+    static int getNumCanvas();
     /**
      * @brief      Gets the editor identifiers.
      *
-     * @param      cc            { parameter_description }
+     * @param      cc            Canvas
      * @param      editorIdList  The editor identifier list
      */
-
-    static void broadcastNewCanvas();
-    static int getNumCanvas();
     static void getEditorIds(CyclopsCanvas* cc, Array<int>& editorIdList);
     static HookView* getHookView(int node_id);
     static void dropEditor(CyclopsCanvas* closingCanvas, int node_id);
@@ -210,14 +207,17 @@ public:
 private:
     
     // GUI stuff
+    ScopedPointer<IndicatorLED>  devStatus;
     ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device list */
     ScopedPointer<ComboBox> portCombo;          /**< List of all available dvices */
     ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
     OwnedArray<UtilityButton> testButtons;      /**< TEST Buttons */
 
-    //ScopedPointer<HookViewDisplay> bfbf;
     ScopedPointer<HookViewDisplay> hookViewDisplay;
     ScopedPointer<HookViewport> hookViewport;
+
+    ScopedPointer<SignalDisplay> signalDisplay;
+    ScopedPointer<SignalViewport> signalViewport;
 
     ScopedPointer<ProgressBar> progressBar;
     ScopedPointer<UtilityButton> closeButton;   /**< Used to close a canvas */
@@ -254,6 +254,35 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsCanvas);
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class IndicatorLED : public Component
+                   , public SettableTooltipClient
+{
+public:
+    IndicatorLED (const Colour& fill, const Colour& line);
+    void paint (Graphics& g);
+    void update (const Colour& fill, String tooltip);
+    void update (const Colour& fill, const Colour& line, String tooltip);
+private:
+    Colour fillColour, lineColour;
+};
 
 
 
@@ -337,6 +366,36 @@ public:
 };
 
 
+
+
+
+
+
+
+
+
+
+
+class SignalDisplay : public Component
+{
+public:
+    SignalDisplay(CyclopsCanvas *cc);
+    void resized();
+    void paint(Graphics& g);
+
+    CyclopsCanvas *canvas;
+};
+
+
+
+class SignalViewport : public Viewport
+{
+public:
+    SignalViewport(SignalDisplay* sd);
+    void paint(Graphics& g);
+private:
+    SignalDisplay* signalDisplay;
+};
 
 
 

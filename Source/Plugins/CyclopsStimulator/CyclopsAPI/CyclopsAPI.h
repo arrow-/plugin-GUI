@@ -1,7 +1,11 @@
 #ifndef OE_CYCLOPS_API_H
 #define OE_CYCLOPS_API_H
 
+#include "../../../../JuceLibraryCode/JuceHeader.h"
 #include <cstdint>
+#include <iostream>
+#include <string>
+#include <fstream>
 
 /*
 Field       | Bits  | Description
@@ -16,6 +20,8 @@ command[2:0] | Name     | Effect
 ``001``      | stop     | Pause Waveform generation.
 ``010``      | reset    | Reset selected sources. @attention The system is *not* reset to _initial configuration_!
 ``011``      | swap     | Swap the Cyclops instances of the 2 high ``channel`` bits.
+``100``      | launch   | Launch the experiment main-loop.
+``101``      | end      | Stop the experiment main-loop. The teensy will enter a restricted mode, responding only to some Single byte commands: [launch, identity]. For all commands, an error code will be returned.
 ``111``      | identity | Send device description.
 
 Field       | Bits  | Description
@@ -37,6 +43,35 @@ command[4:0]  | Name               | Size(Bytes) | Effect
 ``01000``     | square_off_time    | 5           | Set squareSource pulse "OFF" time.
 ``01001``     | square_on_level    | 3           | Set squareSource pulse "ON" voltage.
 ``01010``     | square_off_level   | 3           | Set squareSource pulse "OFF" voltage.
+
+@subsection return-codes Error and Success Codes
+
+These are the _codes_ which will be returned by the teensy when an RPC command is recieved by it.
+
+``EA`` _stands for_ **Experiment is Active**
+
+``notEA`` _stands for_ **Experiment is Inactive**
+
+@subsubsection RC-success Success Codes
+
+Success codes never start with first nibble HIGH ``~(0xFX)``
+
+| Name     | Upon recieving...                                                  | ...while in state              | Action when ``EA``                                             | Action when ``notEA``                                  | Code     |
+| -------- | ------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------ | -------- |
+| LAUNCH   | ``SB.launch``                                                      | both ``EA`` and ``notEA``      | **No Effect**                                                 | **Starts main-loop**, thereby starting the experiment. | ``0x00`` |
+| END      | ``SB.end``                                                         | only when ``EA``               | **Breaks out of mainloop**, resets sources, grounds all LEDs. | **NA**                                                 | ``0x01`` |
+| SB.DONE  | ``SB.*`` (except ``SB.launch``, ``SB.end`` and ``SB.identity``)    | only when ``EA``               | Suitable action is performed.                                 | **NA**                                                 | ``0x10`` |
+| IDENTITY | ``SB.identity``                                                    | both ``EA`` and ``notEA``      | Identification Info is returned.                              | **NA**                                                 | ``0x11`` |
+| MB.DONE  | ``MB.*``                                                           | only when ``EA``               | Suitable action is performed.                                 | **NA**                                                 | ``0x20`` |
+
+@subsubsection RC-error Error Codes
+
+Error codes generally start with first nibble HIGH ``(0xFX)``
+
+| Name           | Reason                                                                                                                     | ...while in state   | Code     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------- |
+| EA_RPC_FAIL    | ``SB.*`` or ``MB.*`` failed due to either inability to perform task, or task cannot be done when experiment is _Live_.     | only when ``EA``    | ``0xf0`` |
+| notEA_RPC_FAIL | ``SB.*`` or ``MB.*`` failed due to either inability to perform task, or task cannot be done when experiment is _Not Live_. | only when ``notEA`` | ``0xf1`` |
 */
 
 /**
@@ -52,6 +87,21 @@ namespace cyclops
 
 static const int RPC_HEADER_SZ = 1;
 static const int RPC_MAX_ARGS  = 4;
+static const int RPC_IDENTITY_SZ = 65;
+
+enum class operationMode
+{
+    LOOPBACK,
+    ONE_SHOT,
+    N_SHOT
+};
+
+enum class sourceType
+{
+    STORED,
+    GENERATED,
+    SQUARE
+};
 
 struct CyclopsRPC
 {
@@ -59,13 +109,28 @@ struct CyclopsRPC
     int length;
 };
 
+class CyclopsSignal{
+public:
+    int type;
+    int size;
+    std::string name;
+    Array<int> voltage, holdTime;
+
+    bool read(std::ifstream& file);
+
+    static OwnedArray<CyclopsSignal> signals;
+    static void readSignals(std::ifstream& inFile);
+};
+
 enum singleByteCommands
 {
-    START    = 0,
-    STOP     = 1,
-    RESET    = 2,
-    SWAP     = 3,
-    IDENTITY = 7
+    CL_SB_START     = 0,
+    CL_SB_STOP      = 1,
+    CL_SB_RESET     = 2,
+    CL_SB_SWAP      = 3,
+    CL_SB_LAUNCH    = 4,
+    CL_SB_END       = 5,
+    CL_SB_IDENTITY  = 7
 };
 
 enum multiByteCommands
@@ -96,6 +161,18 @@ enum multiByteLength
     SQUARE_OFF_TIME_LEN    = 5,
     SQUARE_ON_LEVEL_LEN    = 3,
     SQUARE_OFF_LEVEL_LEN   = 3
+};
+
+enum returnCode
+{
+    CL_RC_LAUNCH,
+    CL_RC_END,
+    CL_RC_SBDONE,
+    CL_RC_MBDONE,
+    CL_RC_IDENTITY,
+    CL_RC_EA_FAIL,
+    CL_RC_NEA_FAIL,
+    CL_RC_UNKNOWN
 };
 
 /*
@@ -129,7 +206,22 @@ bool reset (CyclopsRPC *rpc, const int *channels, int channelCount);
 bool swap (CyclopsRPC *rpc, int c1, int c2);
 
 /**
- * @brief      Query the Cyclops Board for connected channels, firmware version etc.
+ * @brief      Launches the experiment on the teensy.
+ * @ingroup    ns-cyclops
+ */
+bool launch (CyclopsRPC *rpc);
+
+/**
+ * @brief      Ends the experiment on the teensy, which can be relaunched.
+ * @ingroup    ns-cyclops
+ */
+bool end (CyclopsRPC *rpc);
+
+/**
+ * @brief      Query the Cyclops Board for connected channels, firmware version
+ *             etc.
+ * @attention  This cannot be invoked when aquisition is active (the teensy can
+ *             handle it, but the GUI cannot).
  * @ingroup    ns-cyclops
  */
 bool identify (CyclopsRPC *rpc);
