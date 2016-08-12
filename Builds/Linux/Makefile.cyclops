@@ -59,6 +59,7 @@ all: notify $(SUBDIRS)
 notify:
 	@echo "Building Open-Ephys -- Cyclops Plugins"
 	@echo "Updating and preparing the Signal Database [from plugins/signals.txt]"
+	-@mkdir -p $(OUTDIR)
 	-@cp $(PLUGIN_DIR)/signals.txt $(OUTDIR)
 
 $(SUBDIRS):
