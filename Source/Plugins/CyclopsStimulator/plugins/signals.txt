@@ -1,0 +1,24 @@
+0 veryLongNameForASignal 6
+54 68 684 68 684 6301
+0 0 0 60 4 97
+
+2 smallStored 3
+5 4 4
+5 5 8
+0 sawtooth-ish 6
+54 68 684 68 684 6301
+0 0 0 60 4 97
+
+1 recruitAccess 3
+5 4 4
+5 5 8
+0 discover 6
+54 68 684 68 684 6301
+0 0 0 60 4 97
+
+2 peerAutomate 3
+5 4 4
+5 5 8
+0 fractalChaos 6
+54 68 684 68 684 6301
+0 0 0 60 4 97

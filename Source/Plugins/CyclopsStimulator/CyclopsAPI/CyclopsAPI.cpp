@@ -31,6 +31,7 @@ inline static uint8_t getMultiByteHeader (int _channel)
 
 
 OwnedArray<CyclopsSignal> CyclopsSignal::signals;
+bool CyclopsSignal::isPrepared = false;
 
 bool CyclopsSignal::read(std::ifstream& file)
 {
@@ -55,13 +56,15 @@ bool CyclopsSignal::read(std::ifstream& file)
 
 void CyclopsSignal::readSignals(std::ifstream& inFile)
 {
-    inFile.exceptions(std::ifstream::eofbit);
-    while (true){
-        CyclopsSignal *cs = new CyclopsSignal();
-        if (cs->read(inFile))
-            CyclopsSignal::signals.add(cs);
-        else
-            break;
+    if (!isPrepared){
+        inFile.exceptions(std::ifstream::eofbit | std::ifstream::badbit | std::ifstream::failbit);
+        while (true){
+            CyclopsSignal *cs = new CyclopsSignal();
+            if (cs->read(inFile))
+                CyclopsSignal::signals.add(cs);
+            else
+                break;
+        }
     }
 }
 

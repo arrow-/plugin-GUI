@@ -19,6 +19,7 @@ struct CyclopsPluginInfo
     int channelCount;
     int timePeriod;
     std::vector<std::string> sourceCodeNames;
+    std::vector<sourceType>  sourceCodeTypes;
     CyclopsPlugin* (*CyclopsPluginFactory)();
 };
 

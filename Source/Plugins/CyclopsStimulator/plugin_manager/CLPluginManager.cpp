@@ -208,6 +208,10 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
         std::cout << "CPM>     (!!) No Sources (aka Signals) have been defined for the plugin!\nFAILED to load plugin" << pInfo.Name << std::endl;
         return -1;
     }
+    else if (pInfo.sourceCount != (int)pInfo.sourceCodeTypes.size()){
+        std::cout << "CPM>     (!!) sourceCount doest not match no. of \"Source-Code-Types\".\nFAILED to load plugin" << pInfo.Name << std::endl;
+        return -1;
+    }
     // successful load, plugin seems valid.
     pInfoMap[pInfo.Name] = pInfo;
     return 1;

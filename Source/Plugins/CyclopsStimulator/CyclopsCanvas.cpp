@@ -75,25 +75,34 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
         testButtons[i]->addListener(this);
         addAndMakeVisible(testButtons[i]);
     }
-    progressBar = new ProgressBar(progress);
-    progressBar->setPercentageDisplay(false);
-    addChildComponent(progressBar);
-    pstep = 0.01;
-    // communicate with teensy?
     
     // Add close Button
     closeButton = new UtilityButton("close", Font("Default", 9, Font::plain));
     closeButton->addListener(this);
     addChildComponent(closeButton);
 
+    hookLabel = new Label("HookLabel", "Connected Hooks");
+    hookLabel->setFont(Font("Default", 20, Font::plain));
+    hookLabel->setColour(Label::textColourId, Colours::black);
+    addAndMakeVisible(hookLabel);
     hookViewDisplay = new HookViewDisplay(this);
     hookViewport = new HookViewport(hookViewDisplay);
     addAndMakeVisible(hookViewport);
+
+    sigLabel = new Label("SigLabel", "Signal Collection");
+    sigLabel->setFont(Font("Default", 20, Font::plain));
+    sigLabel->setColour(Label::textColourId, Colours::black);
+    addAndMakeVisible(sigLabel);
 
     signalDisplay = new SignalDisplay(this);
     signalViewport = new SignalViewport(signalDisplay);
     addAndMakeVisible(signalViewport);
 
+    progressBar = new ProgressBar(progress);
+    progressBar->setPercentageDisplay(false);
+    addChildComponent(progressBar);
+    pstep = 0.01;
+    // communicate with teensy?
     refreshPlugins();
 }
 
@@ -155,6 +164,7 @@ void CyclopsCanvas::refreshState()
 
 void CyclopsCanvas::resized()
 {
+    //std::cout << "resizing canvas" << std::endl;
     int width = getWidth(), height = getHeight();
     baudrateCombo->setBounds(width-75, 5, 70, 20);
     portCombo->setBounds(width-75-5-70, 5, 70, 20);
@@ -165,17 +175,19 @@ void CyclopsCanvas::resized()
     progressBar->setBounds(2, height-16, width-4, 16);
     closeButton->setBounds(width/2-20, 5, 40, 20);
 
-    hookViewport->setBounds(2, 50, width-100, height/2-30);
+    hookLabel->setBounds(20, 5, jmax(200, width-200), 24);
+    hookViewport->setBounds(2, 30, width-100, height/2-30);
     hookViewDisplay->setBounds( 0
                               , 0
                               , width-100-hookViewport->getScrollBarThickness()
-                              , 40+50*canvasEventListeners.size());
+                              , hookViewDisplay->height);
 
-    signalViewport->setBounds(2, 50+10+height/2-30, width-100, height/2-30);
+    sigLabel->setBounds(20, 30+5+height/2-30, jmax(200, width-200), 24);
+    signalViewport->setBounds(2, 30+30+height/2-30, width/2-50, height/2-30);
     signalDisplay->setBounds( 0
                             , 0
-                            , width-100-signalViewport->getScrollBarThickness()
-                            , 20+18*CyclopsSignal::signals.size());
+                            , width/2-50-signalViewport->getScrollBarThickness()
+                            , 10+30*CyclopsSignal::signals.size());
 }
 
 int CyclopsCanvas::getNumCanvas()
@@ -233,6 +245,7 @@ void CyclopsCanvas::dropEditor(CyclopsCanvas* closingCanvas, int node_id)
 
 void CyclopsCanvas::refresh()
 {
+    //std::cout << "refreshing hvd" << std::endl;
     hookViewDisplay->refresh();
     resized();
 }
@@ -486,6 +499,7 @@ void CyclopsCanvas::addHook(int node_id)
 {
     HookView* hv = CyclopsCanvas::hookViews.add(new HookView(node_id));
     hookViewDisplay->addAndMakeVisible(hv);
+    //std::cout << "added hook" << std::endl;
 }
 
 bool CyclopsCanvas::removeHook(int node_id)
@@ -655,35 +669,43 @@ void HookViewport::paint(Graphics& g)
 
 
 HookViewDisplay::HookViewDisplay(CyclopsCanvas* _canvas) : canvas(_canvas)
+                                                         , height(45)
 {
 }
 
 void HookViewDisplay::paint(Graphics& g)
 {
-    g.fillAll(Colours::orange);
+    //std::cout << "painting hvd" << std::endl;
+    g.fillAll(Colours::darkgrey);
 }
 
 void HookViewDisplay::refresh()
 {
+    height = 5;
     shownIds.clear();
     CyclopsCanvas::getEditorIds(canvas, shownIds);
+    //std::cout << "Now showing " << shownIds.size();
     for (int i=0; i<shownIds.size(); i++){
         HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
         jassert(hv != nullptr);
         jassert(isParentOf(hv));
-        hv->setBounds(5, 50+i*(hv->getHeight()+5), getWidth()-80, hv->getHeight());
+        hv->setBounds(5, height, getWidth()-80, jmax(45, hv->getHeight()));
+        height += jmax(45, hv->getHeight()) + 5;
         hv->repaint();
     }
+    //std::cout << ". Height: " << height << std::endl;
+    setSize(getWidth(), height);
     repaint();
 }
 
 void HookViewDisplay::resized()
 {
+    //std::cout << "resizing hvd to " << getHeight() << std::endl;
     for (int i=0; i<shownIds.size(); i++){
         HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
         jassert(hv != nullptr);
         jassert(isParentOf(hv));
-        hv->setSize(getWidth()-80, 45);
+        hv->setSize(getWidth()-80, jmax(45, hv->getHeight()));
     }
 }
 
@@ -723,8 +745,13 @@ void HookViewDisplay::enableAllInputWidgets()
 
 
 
-
 HookView::HookView(int node_id) : nodeId(node_id)
+                                , dragShouldDraw(true)
+                                , isDragging(false)
+                                , offset(false)
+                                , dragDescription(nullptr)
+                                , signalRectStroke(new PathStrokeType(1))
+
 {
     hookIdLabel = new Label("hook_id", String(nodeId));
     hookIdLabel->setFont(Font("Default", 16, Font::plain));
@@ -749,25 +776,142 @@ void HookView::comboBoxChanged(ComboBox* cb)
     HookViewDisplay* parent = findParentComponentOfClass<HookViewDisplay>();
     parent->canvas->unicastPluginIndicator(CanvasEvent::PLUGIN_SELECTED, nodeId);
     parent->canvas->unicastUpdatePluginInfo(nodeId);
-    std::cout << cb->getSelectedItemIndex() <<std::endl;
+    //std::cout << cb->getSelectedItemIndex() <<std::endl;
     String name = cb->getItemText(cb->getSelectedItemIndex());
     hookInfo->pluginInfo = CyclopsCanvas::pluginManager->getInfo(name.toStdString());
+
+    // remove any selected Labels
+    codeLabels.clear();
+    signalLabels.clear();
+    // resize the selectionMap, "zero" it in loop
+    hookInfo->selectedSignals.resize(hookInfo->pluginInfo->sourceCount);
+    // add sourceCodeLabels
+    std::vector<std::string>* codeNames = &hookInfo->pluginInfo->sourceCodeNames;
+    for (int i=0; i < hookInfo->pluginInfo->sourceCount; i++){
+        Label* l = codeLabels.add(new Label("codelabel", String(codeNames->at(i))));
+        l->setFont(Font("Default", 16, Font::plain));
+        l->setColour(Label::textColourId, Colours::black);
+        addAndMakeVisible(l);
+
+        // pre-make the selectedSignalLabels, this vastly simplifies access to these labels
+        l = signalLabels.add(new Label("siglabel", "."));
+        l->setFont(Font("Default", 15, Font::plain));
+        l->setColour(Label::textColourId, Colours::black);
+        l->setBounds(240+145, 5+20*i, 130, 18);
+        addChildComponent(l);
+
+        hookInfo->selectedSignals[i] = false;
+    }    
+    // set sizes
+    setSize(parent->getWidth()-80, jmax(45, 20+20*codeLabels.size()));
+    parent->refresh();
+    prepareForDrag();
 }
 
 void HookView::paint(Graphics& g)
 {
     g.fillAll(Colours::lightgrey);
+    int mouseIndex = -1;
+    if (!dragShouldDraw)
+        mouseIndex = getIndexfromXY(getMouseXYRelative());
+    if (hookInfo->pluginInfo != nullptr){
+        // flushing away drawing
+        g.setFillType(FillType(Colours::lightgrey));
+        g.fillRect(235, 0, 5+150+2+123, hookInfo->pluginInfo->sourceCount*20+10);
+
+        for (int i=0; i < hookInfo->pluginInfo->sourceCount; i++){
+            // drawing gradients
+            switch (getCodeType(i)) {
+                case 0:
+                    g.setGradientFill(ColourGradient( Colour(0xFFf06292)
+                                                    , 240, 0
+                                                    , Colour(0x00f06292)
+                                                    , 240+150, 0
+                                                    , false));
+                break;
+                case 1:
+                    g.setGradientFill(ColourGradient( Colour(0xFFffd54f)
+                                                    , 240, 0
+                                                    , Colour(0x00ffd54f)
+                                                    , 240+150, 0
+                                                    , false));
+                break;
+                case 2:
+                    g.setGradientFill(ColourGradient( Colour(0xFFa7ffeb)
+                                                    , 240, 0
+                                                    , Colour(0x00a7ffeb)
+                                                    , 240+150, 0
+                                                    , false));
+                break;
+                default:
+                    g.setFillType(FillType(Colours::lightgrey));
+            }
+            // the actual gradient rect
+            g.fillRect(240, 5+20*i, 150, 18);
+
+            switch (getCodeType(i)){
+                case 0:
+                    g.setFillType(FillType(Colour(0xFFe91e63)));
+                    break;
+                case 1:
+                    g.setFillType(FillType(Colour(0xFFffc107)));
+                    break;
+                case 2:
+                    g.setFillType(FillType(Colour(0xFF1de9b6)));
+                    break;
+                default:
+                    g.setFillType(FillType(Colours::lightgrey));
+            }
+            if (i == mouseIndex){
+                // hiding the label under the mouse
+                signalLabels[i]->setVisible(false);
+                g.fillRect(240+142, 7+20*i, 80, 16);
+                Path p;
+                p.addRectangle(240+142, 7+20*i, 80, 16);
+                float dashOriginal[] = {5, 3, 1, 3};
+                float dashOffset[] = {1, 3, 5, 3};
+                if (offset)
+                    signalRectStroke->createDashedStroke(p, p, dashOffset, 4);
+                else
+                    signalRectStroke->createDashedStroke(p, p, dashOriginal, 4);
+
+                g.setFillType(FillType(Colours::black));
+                g.fillPath(p);
+                g.drawFittedText( dragDescription->getUnchecked(4).toString()
+                                , 240+144, 5+20*i
+                                , 78, 20
+                                , Justification::verticallyCentred | Justification::left
+                                , 1, 1.0);
+            }
+            else if (i != mouseIndex && hookInfo->selectedSignals[i]){
+                signalLabels[i]->setVisible(true);
+                // draw background rectangle
+                g.fillRoundedRectangle(240+142, 7+20*i, 133, 16, 3);
+            }
+        }
+        if (isDragging){
+            g.setFillType(FillType(Colours::black));
+            g.fillPath(signalRect);
+        }
+    }
 }
 
 void HookView::resized()
 {
     hookIdLabel->setBounds(5, 0, 35, 30);
     pluginSelect->setBounds(40, 2, 180, 30);
+    int index = 0;
+    for (auto& label : codeLabels){
+        label->setBounds(240, 5+20*(index++), 150, 20);
+    }
 }
 
 void HookView::refresh()
 {
     // parse all things in HookInfo
+    if (hookInfo->pluginInfo != nullptr){
+        prepareForDrag();
+    }
     repaint();
 }
 
@@ -777,6 +921,66 @@ bool HookView::isReady()
         return false;
     return true;
 }
+
+void HookView::timerCallback()
+{
+    offset = !offset;
+    prepareForDrag(offset);
+    repaint();
+}
+
+bool HookView::isInterestedInDragSource(const SourceDetails& dragSouceDetails)
+{
+    dragDescription = dragSouceDetails.description.getArray();
+    jassert(dragDescription != nullptr);
+    if (hookInfo->pluginInfo != nullptr && dragDescription->getUnchecked(1).toString().startsWith("signalButton"))
+        return true;
+    dragDescription = nullptr;
+    dragShouldDraw = true;
+    return false;
+}
+
+void HookView::itemDragEnter(const SourceDetails& dragSouceDetails)
+{
+    isDragging = true;
+    startTimer(300);
+}
+
+void HookView::itemDragMove(const SourceDetails& dragSouceDetails)
+{
+    int index = getIndexfromXY(dragSouceDetails.localPosition);
+    jassert(dragDescription != nullptr);
+    if (index > -1 && getCodeType(index) == (int)dragDescription->getUnchecked(3))
+        dragShouldDraw = false;
+    else
+        dragShouldDraw = true;
+    repaint();
+}
+
+void HookView::itemDragExit(const SourceDetails& dragSouceDetails)
+{
+    isDragging = false;
+    dragDescription = nullptr;
+    dragShouldDraw = true;
+    stopTimer();
+    repaint();
+}
+
+void HookView::itemDropped(const SourceDetails& dragSouceDetails)
+{
+    addSignal(dragSouceDetails.localPosition);
+    isDragging = false;
+    dragDescription = nullptr;
+    dragShouldDraw = true;
+    stopTimer();
+    repaint();
+}
+
+bool HookView::shouldDrawDragImageWhenOver()
+{
+    return dragShouldDraw;
+}
+
 
 void HookView::disableAllInputWidgets()
 {
@@ -788,6 +992,48 @@ void HookView::enableAllInputWidgets()
     pluginSelect->setEnabled(true);
 }
 
+void HookView::prepareForDrag(int offset /* = 0 */)
+{
+    signalRect.clear();
+    signalRect.addRoundedRectangle(235, 2, 285, hookInfo->pluginInfo->sourceCount*20+6, 4);
+    float dashOriginal[] = {6, 3, 2, 3};
+    float dashOffset[] = {2, 3, 6, 3};
+    if (offset)
+        signalRectStroke->createDashedStroke(signalRect, signalRect, dashOffset, 4);
+    else
+        signalRectStroke->createDashedStroke(signalRect, signalRect, dashOriginal, 4);
+}
+
+
+int HookView::getIndexfromXY(const Point<int>& pos)
+{
+    int x = pos.getX(),
+        y = pos.getY(),
+        index = -1;
+    if (x > 240 && y > 5 && y < hookInfo->pluginInfo->sourceCount*20+5){
+        // in signalRect
+        index = (y-5)/20;
+        // sanity check!
+        jassert (index < hookInfo->pluginInfo->sourceCount);
+    }
+    return index;
+}
+
+void HookView::addSignal(const Point<int>& pos)
+{
+    int index = getIndexfromXY(pos);
+    if (index > -1 && !dragShouldDraw){
+        hookInfo->selectedSignals[index] = true;
+        Label* l = signalLabels[index];
+        l->setText(dragDescription->getUnchecked(4).toString(), dontSendNotification);
+        l->setVisible(true);
+    }
+}
+
+int  HookView::getCodeType(int index)
+{
+    return (int) (hookInfo->pluginInfo->sourceCodeTypes[index]);
+}
 
 
 
@@ -795,7 +1041,17 @@ void HookView::enableAllInputWidgets()
 
 
 
-HookInfo::HookInfo(int node_id) : nodeId(node_id), pluginInfo(nullptr) {}
+
+
+
+
+
+
+HookInfo::HookInfo(int node_id) : nodeId(node_id)
+                                , pluginInfo(nullptr)
+{
+    ;
+}
 
 
 
@@ -803,34 +1059,165 @@ HookInfo::HookInfo(int node_id) : nodeId(node_id), pluginInfo(nullptr) {}
 
 
 
+
+
+
+SignalButton::SignalButton(int index, SignalView* parent) : ShapeButton(String(index), Colours::black, Colours::black, Colours::black)
+                                                          , signalIndex(index)
+{
+    roundedRect.addRoundedRectangle(0, 0, 150, 26, 2);
+    setShape(roundedRect, true, false, false);
+    CyclopsSignal* cs = CyclopsSignal::signals.getUnchecked(signalIndex);
+    text = cs->name;
+    parentView = parent;
+    switch (cs->type){
+        case 0: // STORED
+        setColours( Colour(0xFFe91e63)
+                  , Colour(0xFFf06292)
+                  , Colour(0xFFad1457));
+        break;
+        case 1: // GENERATED
+        setColours( Colour(0xFFffc107)
+                  , Colour(0xFFffd54f)
+                  , Colour(0xFFff8f00));
+        break;
+        case 2: // SQUARE
+        setColours( Colour(0xFF1de9b6)
+                  , Colour(0xFFa7ffeb)
+                  , Colour(0xFF00bfa5));
+        break;
+    }
+    setOutline(Colours::black, 1.0);
+    setTooltip("Press to view details, Drag above to Hook Settings");
+}
+
+void SignalButton::mouseDrag(const MouseEvent& e)
+{
+    ShapeButton::mouseDrag(e);
+    parentView->dragging(this);
+}
+
+void SignalButton::mouseUp(const MouseEvent& e)
+{
+    ShapeButton::mouseUp(e);
+    parentView->dragDone(this);
+}
+
+void SignalButton::paintButton(Graphics& g, bool isMouseOverButton, bool isButtonDown)
+{
+    ShapeButton::paintButton(g, isMouseOverButton, isButtonDown);
+    g.drawFittedText( text
+                    , (isButtonDown)? 10 : 5
+                    , 1
+                    , 150 - ((isButtonDown)? 10 : 5)
+                    , 24
+                    , Justification::verticallyCentred | Justification::left
+                    , 1
+                    , 1.0);
+}
+
+
+
+SignalView::SignalView(int index, SignalDisplay *parent) : signalIndex(index)
+                                                         , parentDisplay(parent)
+{
+    signalButton = new SignalButton(signalIndex, this);
+    addAndMakeVisible(signalButton);
+    signalButton->addListener(this);
+    signalButton->setBounds(0, 0, 150, 26);
+    setSize(300, 30);
+}
+
+void SignalView::buttonClicked(Button* btn)
+{
+    parentDisplay->showDetails(signalIndex);
+}
+
+void SignalView::mouseDrag(const MouseEvent& e)
+{
+    parentDisplay->dragging(signalButton);
+}
+
+void SignalView::mouseUp(const MouseEvent& e)
+{
+    parentDisplay->dragDone(signalButton);
+}
+
+void SignalView::paint(Graphics& g)
+{
+    //g.fillAll(Colours::white);
+}
+
+void SignalView::dragging(SignalButton* sb)
+{
+    parentDisplay->dragging(sb);
+}
+
+void SignalView::dragDone(SignalButton* sb)
+{
+    parentDisplay->dragDone(sb);
+}
 
 SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
+                                                , isDragging(false)
 {
-    std::ifstream inFile("build/cyclops_plugins/signals");
+    std::ifstream inFile("build/cyclops_plugins/signals.txt");
     if (inFile)
         CyclopsSignal::readSignals(inFile);
     else
         jassert(false);
     inFile.close();
-    setSize(300, CyclopsSignal::signals.size()*18 + 40);
+
+    for (int i=0; i<CyclopsSignal::signals.size(); i++){
+        SignalView *sv = signalViews.add(new SignalView(i, this));
+        sv->setBounds(25, 5+sv->getHeight()*i, sv->getWidth(), sv->getHeight());
+        addAndMakeVisible(sv);
+    }
+    setSize(300, CyclopsSignal::signals.size()*30);
+}
+
+void SignalDisplay::showDetails(int index)
+{
+    CyclopsSignal* cs = CyclopsSignal::signals.getUnchecked(index);
+    std::cout << std::endl << cs->name << "::T" << cs->type << " Points: " << cs->size << std::endl;
+    int length=0;
+    for (int i=0; i<cs->size; i++) length += cs->holdTime[i];
+    std::cout << "Length (ms): " << length << std::endl;
+}
+
+void SignalDisplay::dragging(SignalButton* sb)
+{
+    if (!isDragging){
+        //std::cout << "start" << std::endl;
+        isDragging = true;
+        int index = sb->signalIndex;
+        CyclopsSignal* cs = CyclopsSignal::signals.getUnchecked(index);
+
+        Array<var> dragData;
+        dragData.add(true); // user doing this live, false implies load from XML
+        dragData.add("signalButton");
+        dragData.add(index);
+        dragData.add(cs->type);
+        dragData.add(String(cs->name));
+        canvas->startDragging(dragData, sb);
+    }
+}
+
+void SignalDisplay::dragDone(SignalButton* sb)
+{
+    //std::cout << "done" << std::endl;
+    isDragging = false;
 }
 
 void SignalDisplay::paint(Graphics& g)
 {
-    g.fillAll(Colours::cyan);
-    g.setColour(Colours::black);
-    //std::cout << getHeight() << " " << CyclopsSignal::signals.size() << std::endl;
-    for (int i=0; i<CyclopsSignal::signals.size(); i++){
-        g.drawSingleLineText(CyclopsSignal::signals[i]->name, 5, 28+18*i);
-        //std::cout << i << " " << 20+18*i << std::endl;
-    }
+    g.fillAll(Colours::darkgrey);
 }
 
 void SignalDisplay::resized()
 {
 
 }
-
 
 
 
@@ -849,6 +1236,7 @@ SignalViewport::SignalViewport(SignalDisplay* sd) : signalDisplay(sd)
 void SignalViewport::paint(Graphics& g)
 {
 }
+
 
 
 

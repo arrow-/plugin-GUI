@@ -29,6 +29,7 @@
 #include <EditorHeaders.h>
 #include <SerialLib.h>
 #include <string>
+#include <vector>
 
 #include "plugin_manager/CLPluginManager.h"
 
@@ -72,6 +73,9 @@ class HookInfo;
 class HookView;
 class HookViewDisplay;
 class HookViewport;
+
+class SignalButton;
+class SignalView;
 class SignalDisplay;
 class SignalViewport;
 
@@ -81,6 +85,7 @@ class SignalViewport;
 class CyclopsCanvas : public Visualizer
                     , public Button::Listener
                     , public ComboBox::Listener
+                    , public DragAndDropContainer
 {
 public:
 
@@ -213,9 +218,11 @@ private:
     ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
     OwnedArray<UtilityButton> testButtons;      /**< TEST Buttons */
 
+    ScopedPointer<Label> hookLabel;
     ScopedPointer<HookViewDisplay> hookViewDisplay;
     ScopedPointer<HookViewport> hookViewport;
-
+    
+    ScopedPointer<Label> sigLabel;
     ScopedPointer<SignalDisplay> signalDisplay;
     ScopedPointer<SignalViewport> signalViewport;
 
@@ -321,6 +328,7 @@ public:
 
     Array<int> shownIds;
     CyclopsCanvas* canvas;
+    int height;
 };
 
 
@@ -337,6 +345,7 @@ class HookInfo{
 public:
     int nodeId;
     CyclopsPluginInfo* pluginInfo;
+    std::vector<bool> selectedSignals;
     HookInfo(int node_id);
 };
 
@@ -348,12 +357,16 @@ public:
 
 class HookView : public Component
                , public ComboBox::Listener
+               , public DragAndDropTarget
+               , public Timer
 {
 public:
     int nodeId;
     ScopedPointer<Label> hookIdLabel;
     ScopedPointer<ComboBox> pluginSelect;
     ScopedPointer<HookInfo> hookInfo;
+    OwnedArray<Label> codeLabels;
+    OwnedArray<Label> signalLabels;
 
     HookView(int node_id);
     void comboBoxChanged(ComboBox* cb);
@@ -361,8 +374,30 @@ public:
     void paint(Graphics& g);
     void resized();
     bool isReady();
+
+    void timerCallback();
+
+    bool isInterestedInDragSource(const SourceDetails& dragSouceDetails);
+    void itemDragEnter(const SourceDetails& dragSouceDetails);
+    void itemDragMove(const SourceDetails& dragSouceDetails);
+    void itemDragExit(const SourceDetails& dragSouceDetails);
+    void itemDropped(const SourceDetails& dragSouceDetails);
+    bool shouldDrawDragImageWhenOver();
+
     void disableAllInputWidgets();
     void enableAllInputWidgets();
+private:
+    bool dragShouldDraw,
+         isDragging,
+         offset;
+    Array<var>* dragDescription;
+    Path signalRect;
+    ScopedPointer<PathStrokeType> signalRectStroke;
+
+    void prepareForDrag(int offset = 0);
+    int  getIndexfromXY(const Point<int>& pos);
+    void addSignal(const Point<int>& pos);
+    int  getCodeType(int index);
 };
 
 
@@ -375,15 +410,64 @@ public:
 
 
 
+class SignalButton : public ShapeButton
+{
+public:
+    String text;
+    int signalIndex;
+    SignalButton(int index, SignalView* parent);
+    /**
+     * @brief      Called when the button is dragged by the mouse.
+     *
+     * @param[in]  e     Describes the event
+     */
+    void mouseDrag(const MouseEvent& e);
+    void mouseUp(const MouseEvent& e);
+    void paintButton(Graphics& g, bool isMouseOverButton, bool isButtonDown);
+private:
+    Path roundedRect;
+    SignalView* parentView;
+};
+
+
+
+class SignalView : public Component
+                 , public Button::Listener
+{
+public:
+    ScopedPointer<SignalButton> signalButton;
+    int signalIndex;
+    SignalView(int index, SignalDisplay *parent);
+    /**
+     * @brief      Called when mouse drags the SignalView (which is slightly
+     *             bigger than the SignalButton).
+     *
+     * @param[in]  e     Describes the event
+     */
+    void mouseDrag(const MouseEvent& e);
+    void mouseUp(const MouseEvent& e);
+    void buttonClicked(Button *btn);
+    void paint(Graphics& g);
+    void dragging(SignalButton* sb);
+    void dragDone(SignalButton* sb);
+private:
+    SignalDisplay *parentDisplay;
+};
 
 class SignalDisplay : public Component
 {
 public:
     SignalDisplay(CyclopsCanvas *cc);
+    void showDetails(int index);
     void resized();
     void paint(Graphics& g);
+    void dragging(SignalButton* sb);
+    void dragDone(SignalButton* sb);
 
+    OwnedArray<SignalView> signalViews;
     CyclopsCanvas *canvas;
+private:
+    bool isDragging;
 };
 
 

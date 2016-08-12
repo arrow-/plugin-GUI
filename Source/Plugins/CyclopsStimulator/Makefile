@@ -8,8 +8,8 @@ SRC_DIR := ${shell find ./ -type d -print}
 # SOURCE_DIRS is not "empty"
 VPATH := $(SOURCE_DIRS)
 
-SRC := $(foreach sdir,$(SRC_DIR), $(filter-out ./plugins%, $(wildcard $(sdir)/*.cpp)))
 # Don't enter plugins directory!
+SRC := $(foreach sdir,$(SRC_DIR), $(filter-out ./plugins%, $(wildcard $(sdir)/*.cpp)))
 OBJ := $(addprefix $(OBJDIR)/,$(notdir $(SRC:.cpp=.o)))
 
 #Extra macros and libraries needed by the plugin

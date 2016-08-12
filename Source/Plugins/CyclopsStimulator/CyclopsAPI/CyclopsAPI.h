@@ -120,6 +120,8 @@ public:
 
     static OwnedArray<CyclopsSignal> signals;
     static void readSignals(std::ifstream& inFile);
+private:
+    static bool isPrepared;
 };
 
 enum singleByteCommands

@@ -8,8 +8,11 @@
 #else
 #define EXPORT
 #endif
-//using namespace cyclops;
 
+/**
+ * @brief      This function should return a pointer to an instance of your
+ *             Cyclops SubPlugin.
+ */
 cyclops::CyclopsPlugin* maker_function()
 {
     return new Example_CL_Plugin;
@@ -28,12 +31,31 @@ cyclops::CyclopsPlugin* maker_function()
  * @param      infoStruct  The information structure which needs to be filled.
  */
 extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStruct) {
-    infoStruct.Name = "Example_CL_Plugin"; // Names of your Cyclops Plugin. This will appear on the GUI.
-    infoStruct.channelCount = 1;  // The no. of LED channels that will be controlled.
-    infoStruct.sourceCount = 4; // The no. of Sources needed on the Teensy, should be same as length of the vector below.
-    infoStruct.sourceCodeNames = {"FastSquare", "SlowSquare", "Triangle", "Sawtooth"}; // this will copy, so it's safe.
+    // Name of your Cyclops SubPlugin. This will appear on the GUI.
+    infoStruct.Name = "Example_CL_Plugin";
+
+    // The no. of LED channels that will be controlled.
+    infoStruct.channelCount = 1;
+    // The no. of Sources needed on the Teensy, should be same as length of the vector below.
+    infoStruct.sourceCount = 4;
+
+    // These are the "Code Names" of the sources (same as the enums you made in <your-plugin>.cpp)
+    // These will appear on the GUI.
+    infoStruct.sourceCodeNames = { "FastSquare"
+                                 , "SlowSquare"
+                                 , "Triangle"
+                                 , "Sawtooth"};
+
+    // This array holds the "type" information of the sources listed above.
+    infoStruct.sourceCodeTypes = { cyclops::sourceType::SQUARE
+                                 , cyclops::sourceType::SQUARE
+                                 , cyclops::sourceType::GENERATED
+                                 , cyclops::sourceType::STORED};
+
     infoStruct.CyclopsPluginFactory = maker_function;
 
-    infoStruct.timePeriod = 250; // 250 ms
+    // If you wish to perform a periodic task on the GUI, during aquisition, you
+    // must set the period here (in milli-seconds)
+    infoStruct.timePeriod = 250; // ms
 }
 
