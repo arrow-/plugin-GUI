@@ -345,7 +345,7 @@ class HookInfo{
 public:
     int nodeId;
     CyclopsPluginInfo* pluginInfo;
-    std::vector<bool> selectedSignals;
+    std::vector<int> selectedSignals;
     HookInfo(int node_id);
 };
 
@@ -468,6 +468,21 @@ public:
     CyclopsCanvas *canvas;
 private:
     bool isDragging;
+    static inline File getSignalsFile(const String& pathFromExeDir) {
+    // SUPPORT APPLE LATER
+    /*
+    #if defined(__APPLE__)
+        File dir = File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Application Support/open-ephys");
+        if (!dir.isDirectory()) {
+            dir.createDirectory();
+        }
+        return std::move(dir);
+    #else
+        return File::getSpecialLocation(File::currentExecutableFile).getParentDirectory();
+    #endif
+    */
+        return File::getSpecialLocation(File::currentExecutableFile).getParentDirectory().getChildFile(pathFromExeDir);
+    }
 };
 
 
@@ -520,4 +535,5 @@ private:
 };
 
 } // NAMESPACE cyclops
+
 #endif

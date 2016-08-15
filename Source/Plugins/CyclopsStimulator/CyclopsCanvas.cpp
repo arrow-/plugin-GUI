@@ -800,7 +800,7 @@ void HookView::comboBoxChanged(ComboBox* cb)
         l->setBounds(240+145, 5+20*i, 130, 18);
         addChildComponent(l);
 
-        hookInfo->selectedSignals[i] = false;
+        hookInfo->selectedSignals[i] = -1;
     }    
     // set sizes
     setSize(parent->getWidth()-80, jmax(45, 20+20*codeLabels.size()));
@@ -883,7 +883,7 @@ void HookView::paint(Graphics& g)
                                 , Justification::verticallyCentred | Justification::left
                                 , 1, 1.0);
             }
-            else if (i != mouseIndex && hookInfo->selectedSignals[i]){
+            else if (i != mouseIndex && hookInfo->selectedSignals[i] > -1){
                 signalLabels[i]->setVisible(true);
                 // draw background rectangle
                 g.fillRoundedRectangle(240+142, 7+20*i, 133, 16, 3);
@@ -1023,7 +1023,7 @@ void HookView::addSignal(const Point<int>& pos)
 {
     int index = getIndexfromXY(pos);
     if (index > -1 && !dragShouldDraw){
-        hookInfo->selectedSignals[index] = true;
+        hookInfo->selectedSignals[index] = (int)dragDescription->getUnchecked(2);
         Label* l = signalLabels[index];
         l->setText(dragDescription->getUnchecked(4).toString(), dontSendNotification);
         l->setVisible(true);
@@ -1161,13 +1161,25 @@ void SignalView::dragDone(SignalButton* sb)
 SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
                                                 , isDragging(false)
 {
-    std::ifstream inFile("build/cyclops_plugins/signals.txt");
-    if (inFile)
-        CyclopsSignal::readSignals(inFile);
-    else
+    File sigFile = getSignalsFile("cyclops_plugins/signals.txt");
+    std::cout << "Fecthing signals.txt from `" << sigFile.getFullPathName() << "`\n";
+    if (!sigFile.existsAsFile()){
+        std::cout << "Signals File not found! Expected @ Builds/Linux/build/cyclops_plugins/signals.txt";
+        std::cout << "\nPerhaps you forgot to compile Cyclops (sub) Plugins?\n" << std::endl;
         jassert(false);
-    inFile.close();
-
+    }
+    else{
+        std::ifstream inFile(sigFile.getFullPathName().toStdString());
+        if (inFile){
+            CyclopsSignal::readSignals(inFile);
+            std::cout << "Signals Collection created!\n\n";
+        }
+        else{
+            std::cout << "Error in opening `Builds/Linux/build/cyclops_plugins/signals.txt`\nCheck if you have permissions to this file.\n" << std::endl;
+            jassert(false);
+        }
+        inFile.close();
+    }
     for (int i=0; i<CyclopsSignal::signals.size(); i++){
         SignalView *sv = signalViews.add(new SignalView(i, this));
         sv->setBounds(25, 5+sv->getHeight()*i, sv->getWidth(), sv->getHeight());
