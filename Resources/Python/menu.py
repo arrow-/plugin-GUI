@@ -67,8 +67,8 @@ class ItemProperties(object):
 menuItemProps = {
     'main'   : ItemProperties(bgColors=['#a5668b', '#d3bcc0'], labelColors=['white', 'black']),
     'signal' : ItemProperties(bgColors=['#05668d', '#427aa1'], labelColors=['black', 'black']),
-    'stored' : ItemProperties(bgColors=['#e91e63', '#f06292'], labelColors=['black', 'black']),
-    'square' : ItemProperties(bgColors=['#1de9b6', '#a7ffeb'], labelColors=['black', 'black'])
+    'stored' : ItemProperties(bgColors=['#e91e63', '#f06292'], labelColors=['black', 'black', '#D5AFBD']),
+    'square' : ItemProperties(bgColors=['#1de9b6', '#a7ffeb'], labelColors=['black', 'black', '#0B7EBC'])
 }
 
 class MenuItem(artist.Artist):
@@ -121,6 +121,10 @@ class MenuItem(artist.Artist):
         self.rect.set(facecolor=self.props.bgColor, alpha=self.props.bgAlpha)
         fig.canvas.mpl_connect('button_release_event', self.check_select)
 
+    def refresh(self):
+        self.recolorLabel()
+        self.rect.set(facecolor=self.props.bgColor, alpha=self.props.bgAlpha)
+
     def check_select(self, event):
         over, junk = self.rect.contains(event)
         if not over:
@@ -129,10 +133,9 @@ class MenuItem(artist.Artist):
         elif self.on_select is not None:
             self.props.set_toDown()
             self.clicked = True
-            self.on_select(self.tempSignal)
+            self.on_select(self.tempSignal, self)
             self.figure.canvas.draw_idle()
-        self.recolorLabel()
-        self.rect.set(facecolor=self.props.bgColor, alpha=self.props.bgAlpha)
+        self.refresh()
 
     def set_extent(self, x, y, w, h):
         self.rect.set_x(x)
@@ -158,8 +161,7 @@ class MenuItem(artist.Artist):
                 self.props.set_toHover()
             else:
                 self.props.set_toIdle()
-            self.recolorLabel()
-            self.rect.set(facecolor=self.props.bgColor, alpha=self.props.bgAlpha)
+            self.refresh()
         return changed
 
     def recolorLabel(self):

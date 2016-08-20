@@ -4,6 +4,7 @@ import os, sys, yaml, argparse
 import numpy as np
 
 class Signal(yaml.YAMLObject):
+    MIN_HOLD_TIME = 50
     def __init__(self, name="TemplateSquare", sourceType=2, size=2, holdTime=[500, 500], voltage=[0, 2047]):
         self.name = name
         self.sourceType = sourceType
@@ -30,13 +31,43 @@ class Signal(yaml.YAMLObject):
 
 
 class TemporarySignal:
+    """The signalEditor creates these objects to plot, and easily manipulate Signal objects.
+    
+    Read Only properties (set only during construction):
+    name        -- Name of signal
+    sourceType  -- Support 0 -> (STORED) and 2 -> (SQUARE)
+    size        -- Number of points
+    dirty       -- Whether a change was made since last `save`
+
+    Setter Methods:
+    setData         -- set `holdTime` and `voltage` together.
+    scaleVoltage    -- Multiplies `voltage` with `factor`
+    scaleTime       -- Scales `holdTime` with `factor`
+    offsetVoltage   -- Adds `offset` to `voltage`
+    invert          -- Inverts `voltage`
+
+    Inspection Methods:
+    getPeriod (gp)      -- get Time Period of the signal
+    getFrequency (gf)   -- get frequency of the signal
+
+    Generation Methods:
+    To create template signals. These methods return (holdTime, voltage) pair of `numpy.ndarray`s
+    These are methods of the `signalEditor.Interactive` class.
+    se.square
+    se.triangle
+    se.sine
+    """
     def __init__(self, manager, orig_signal):
+        """Constructs object, each one requires a manager (for all callbacks to work)
+
+        Automatically clips out of bound values into [0, 4095]
+        """
         self._name = orig_signal.name
         self._sourceType = orig_signal.sourceType
         self._size = orig_signal.size
 
         self._holdTime = np.array(orig_signal.holdTime)
-        self._voltage = np.array(orig_signal.voltage)
+        self._voltage = np.clip(orig_signal.voltage, 0, 4095)
         self._tData = np.insert(np.cumsum(self.holdTime), 0, 0)
         self._vData = np.insert(self.voltage, 0, self.voltage[-1])
         
@@ -68,11 +99,29 @@ class TemporarySignal:
     def dirty(self):
         return self._dirty
 
+    def getPeriod(self):
+        """Get Time Period of the signal"""
+        return self._tData[-1]
+    def gp(self):
+        """Get Time Period of the signal"""
+        return self._tData[-1]
+
+    def getFrequency(self):
+        """Get frequency of the signal"""
+        return 1e6/float(self._tData[-1])
+    def gf(self):
+        """Get frequency of the signal"""
+        return 1e6/float(self._tData[-1])
+
     def setData(self, ht, v):
+        """Checks if length of both arrays is same, and then sets as `holdTime` and `voltage` resp.
+
+        Immediately updates plot.
+        """
         if isinstance(ht, (np.ndarray, list)) and isinstance(v, (np.ndarray, list)):
             if len(ht) == len(v):
                 self._holdTime = np.array(ht)
-                self._voltage = np.array(v)
+                self._voltage = np.clip(v, 0, 4095)
                 self._tData = np.insert(np.cumsum(self.holdTime), 0, 0)
                 self._vData = np.insert(self.voltage, 0, self.voltage[-1])
                 self._size = len(ht)
@@ -89,10 +138,53 @@ class TemporarySignal:
             print("Both args must be of type: [`numpy.ndarray` or `list`]")
             return False
 
+    def scaleVoltage(self, factor):
+        """Multiplies `voltage` with `factor`, but clips out-of-bounds `voltage` values.
 
+        Immediately updates plot.
+        """
+        np.clip(self._voltage*factor, 0, 4095, out=self._voltage)
+        np.clip(self._vData*factor, 0, 4095, out=self._vData)
+        self._manager.onSelect(self)
+        return True
 
+    def scaleTime(self, factor):
+        """Scales `holdTime` with `factor`, which must be positive (and hence non-zero too).
 
+        Will abort if any holdTime value drops below `Signal.MIN_HOLD_TIME` (because of hardware
+        resolution limit)
+        Immediately updates plot (if needed).
+        """
+        assert(factor > 0)
+        newT = self._holdTime*factor
+        m = np.amin(newT)
+        if (m < Signal.MIN_HOLD_TIME):
+            print("This makes smallest holdTime =", m, "usec. But, it must remain >", Signal.MIN_HOLD_TIME)
+            return False
+        if self._manager.verbose:
+            print("Smallest holdTime is now", m, "usec.")
+        self._manager.onSelect(self)
+        return True
 
+    def offsetVoltage(self, offset):
+        """Adds `offset` to `voltage`, but clips out-of-bounds voltage values.
+
+        Immediately updates plot.
+        """
+        np.clip(self._voltage+offset, 0, 4095, out=self._voltage)
+        np.clip(self._vData+offset, 0, 4095, out=self._vData)
+        self._manager.onSelect(self)
+        return True
+
+    def invert(self):
+        """Inverts `voltage`, but clips out-of-bounds voltage values.
+
+        Immediately updates plot. THIS OPERATION IS POTENTIALLY LOSSY!
+        """
+        np.clip(-1*self._voltage, 0, 4095, out=self._voltage)
+        np.clip(-1*self._vData, 0, 4095, out=self._vData)
+        self._manager.onSelect(self)
+        return True
 
 def getChoice(msg, prompt, default=True):
     if default:
@@ -189,7 +281,7 @@ def saveSignalDatabase(file_path, order, sigMap):
             return
     with open(file_path, 'w') as signal_file:
         print("Writing Signals Database to: `" + file_path + '`')
-        saveAll(signal_file, oreder, sigMap)
+        saveAll(signal_file, order, sigMap)
 
 parser = argparse.ArgumentParser(description="Launches the Cyclops Signal Editor, which \
                                  can be used to Read, Add and Delete signals from a \"\
