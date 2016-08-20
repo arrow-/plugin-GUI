@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys, yaml, argparse
+import numpy as np
 
 class Signal(yaml.YAMLObject):
     def __init__(self, name="TemplateSquare", sourceType=2, size=2, holdTime=[500, 500], voltage=[0, 2047]):
@@ -9,16 +10,104 @@ class Signal(yaml.YAMLObject):
         self.size = size
         self.holdTime = holdTime
         self.voltage = voltage
-        self.np_holdTime = None
-        self.np_voltage = None
-        self.holdTime_min = None
-        self.holdTime_max = None
+
+    def minVoltage():
+        min(self.voltage)
+
+    def maxVoltage():
+        max(self.voltage)
 
     def __repr__(self):
         return "%s(name=%s, sourceType=%i, size=%i, holdTime=%r, voltage=%r)" % (self.__class__.__name__, self.name, self.sourceType, self.size, self.holdTime, self.voltage)
 
     def getYAML(self):
+        # d = {'name' : self.name,
+        #      'sourceType' : self.sourceType,
+        #      'size' : self.size,
+        #      'holdTime' : self.holdTime.tolist(),
+        #      'voltage' : self.voltage.tolist()}
         return self.__dict__
+
+
+class TemporarySignal:
+    def __init__(self, manager, orig_signal):
+        self._name = orig_signal.name
+        self._sourceType = orig_signal.sourceType
+        self._size = orig_signal.size
+
+        self._holdTime = np.array(orig_signal.holdTime)
+        self._voltage = np.array(orig_signal.voltage)
+        self._tData = np.insert(np.cumsum(self.holdTime), 0, 0)
+        self._vData = np.insert(self.voltage, 0, self.voltage[-1])
+        
+        self._manager = manager
+        self._dirty = False
+
+    @property
+    def holdTime(self):
+        return self._holdTime
+    @property
+    def voltage(self):
+        return self._voltage    
+    @property
+    def name(self):
+        return self._name
+    @property
+    def sourceType(self):
+        return self._sourceType
+    @property
+    def size(self):
+        return self._size
+    # @property
+    # def tData(self):
+    #     return self._tData
+    # @property
+    # def vData(self):
+    #     return self._vData
+    @property
+    def dirty(self):
+        return self._dirty
+
+    def setData(self, ht, v):
+        if isinstance(ht, (np.ndarray, list)) and isinstance(v, (np.ndarray, list)):
+            if len(ht) == len(v):
+                self._holdTime = np.array(ht)
+                self._voltage = np.array(v)
+                self._tData = np.insert(np.cumsum(self.holdTime), 0, 0)
+                self._vData = np.insert(self.voltage, 0, self.voltage[-1])
+                self._size = len(ht)
+                self._manager.onSelect(self)
+                self._dirty = True
+                if self._manager.verbose:
+                    print('[Hint] Any changes you make to this (temporary) signal object will not be saved!')
+                    print('       Use `se.save()`')
+                return True
+            else:
+                print("Size (aka. first dimension) of both arrays (aka lists) must match!")
+                return False
+        else:
+            print("Both args must be of type: [`numpy.ndarray` or `list`]")
+            return False
+
+
+
+
+
+
+def getChoice(msg, prompt, default=True):
+    if default:
+        opt = '([Y]|n)'
+        notTarget = 'nN'
+    else:
+        opt = '([N]|y)'
+        notTarget = 'yY'
+    if msg != '':
+        res = input('\n'+msg+'\n'+prompt+' '+opt+' ')
+    else:
+        res = input(prompt+' '+opt+' ')
+    if len(res) > 0 and res[0] in notTarget:
+        return False
+    return True
 
 def validate_env():
     cwd = os.getcwd()
@@ -46,8 +135,9 @@ def makePathTable(args):
             path_table['sig_file'] = os.path.join(path_table['source_dir'], "signals.yaml")
     return path_table
 
-def parse(file_handle):
-    sig_list = []
+def parseTxt(file_handle):
+    sig_map = {}
+    orig_ordered_name_list = []
     # type name size holdTime[size] voltage[size]
     lines = file_handle.readlines()
     line = 0
@@ -57,20 +147,30 @@ def parse(file_handle):
         sz = int(lines[line+2].strip())
         ht = [int(x) for x in lines[line+3].strip().split(' ')]
         v = [int(x) for x in lines[line+4].strip().split(' ')]
-        sig_list.append(Signal(name, t, sz, ht, v))
+        sig_map[name] = Signal(name, t, sz, ht, v)
         line += 5
-    return sig_list
+        orig_ordered_name_list.append(name)
+    return sig_map
 
 def parseYAML(file_handle):
-    sig_list = []
+    sig_map = {}
+    orig_ordered_name_list = []
     for x in yaml.load_all(file_handle):
-        sig_list.append(Signal(**x))
-    return sig_list
+        sig_map[x['name']] = Signal(**x)
+        orig_ordered_name_list.append(x['name'])
+    return orig_ordered_name_list, sig_map
+
+def saveYAML(file_handle, signal):
+    return yaml.dump(signal.getYAML(), file_handle, width=80, indent=4, explicit_start=True, explicit_end=True)
+
+def saveAll(file_handle, order, sigMap):
+    for name in order:
+        saveYAML(file_handle, sigMap[name])
 
 def getSignalDatabase(file_path):
     if os.path.exists(file_path):
         with open(file_path, 'r') as signal_file:
-            print("Read Signals Database from: `" + file_path + '`')
+            print("\nRead Signals Database from:\n`" + file_path + '`')
             return parseYAML(signal_file)
     else:
         signal_file = open(file_path, 'w')
@@ -79,7 +179,17 @@ def getSignalDatabase(file_path):
         print("Made a new Signals Database! (signals.yaml), and also added a template signal.")
         print("\nYou can make new signals, and save. Heck! You can even edit the file by hand!")
         print("Not happy? Go ahead and replace this file, look in the OpenEphys GUI repo for a cool replacement!")
-        return list()
+        s = signalIO.Signal()
+        return [s.name], {s.name : s}
+
+def saveSignalDatabase(file_path, order, sigMap):
+    if os.path.exists(file_path):
+        if not getChoice('', "Overwrite file?", default=True):
+            print("Cancelling...")
+            return
+    with open(file_path, 'w') as signal_file:
+        print("Writing Signals Database to: `" + file_path + '`')
+        saveAll(signal_file, oreder, sigMap)
 
 parser = argparse.ArgumentParser(description="Launches the Cyclops Signal Editor, which \
                                  can be used to Read, Add and Delete signals from a \"\
@@ -90,6 +200,10 @@ parser.add_argument('--location', dest='signal_file',
                     action='store', type=str,
                     default=None,
                     help="Use the \"signals.yaml\" from specified path.")
+parser.add_argument('-v', dest='verbose',
+                    action='store_true',
+                    default=False,
+                    help="Show verbose output.")
 parser.add_argument('-B', '--builds', dest='inBuildsDir',
                     action='store_true',
                     default=False,
@@ -99,5 +213,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     pathTable = makePathTable(args)
 
-    signalList = getSignalDatabase(pathTable['sig_file'])
-    print(signalList)
+    origNameOrder, signalMap = getSignalDatabase(pathTable['sig_file'])
+    for name in signalMap:
+        print(name, ":", signalMap[name])
+    #saveSignalDatabase(pathTable['sig_file']+'.sss', signalMap)

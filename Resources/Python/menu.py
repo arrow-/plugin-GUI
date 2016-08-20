@@ -9,8 +9,8 @@ import matplotlib.image as image
 
 class ItemProperties(object):
     def __init__(self, fontSize=15,
-                 labelColors  = ['black', 'black'],
-                 bgColors     = ['yellow', 'blue']):
+                 labelColors  = ['black', 'black'],  # normal, hover, down
+                 bgColors     = ['yellow', 'blue']): # normal, hover, down
         self.fontSize = fontSize
         assert(len(labelColors) > 0)
         assert(len(bgColors)    > 0)
@@ -79,22 +79,22 @@ class MenuItem(artist.Artist):
     def __init__(self, fig, labelstr,
                  props=None,
                  on_select=None,
-                 signal=None):
+                 tempSignal=None):
         artist.Artist.__init__(self)
 
         self.set_figure(fig)
         self.labelstr = labelstr
-        self.signal = signal
+        self.tempSignal = tempSignal
         self.hovering = False
         self.clicked = False
 
         if props is None:
-            if signal == None:
+            if tempSignal == None:
                 props = ItemProperties()
             else:
-                if signal.sourceType == 0:
+                if tempSignal.sourceType == 0:
                     props = menuItemProps['stored']
-                elif signal.sourceType == 2:
+                elif tempSignal.sourceType == 2:
                     props = menuItemProps['square']
                 else:
                     props = menuItemProps['signal']
@@ -129,7 +129,7 @@ class MenuItem(artist.Artist):
         elif self.on_select is not None:
             self.props.set_toDown()
             self.clicked = True
-            self.on_select(self)
+            self.on_select(self.tempSignal)
             self.figure.canvas.draw_idle()
         self.recolorLabel()
         self.rect.set(facecolor=self.props.bgColor, alpha=self.props.bgAlpha)
@@ -176,10 +176,10 @@ class MenuItem(artist.Artist):
                         on_select = on_select)
 
     @staticmethod
-    def makeSignalMenuItem(fig, signal, on_select):
-        return MenuItem(fig, signal.name,
+    def makeSignalMenuItem(fig, tempSignal, on_select):
+        return MenuItem(fig, tempSignal.name,
                         on_select = on_select,
-                        signal=signal)
+                        tempSignal=tempSignal)
 
 
 class Menu(object):
@@ -190,13 +190,6 @@ class Menu(object):
         fig.suppressComposite = True
 
         self.menuItems = menuitems
-        self.numItems = len(menuitems)
-
-        maxw = min(max([item.labelwidth for item in menuitems]), Menu.signalButtonWidth)
-        maxh = max([item.labelheight for item in menuitems])
-
-        totalh = self.numItems*maxh + (self.numItems + 1)*2*MenuItem.pady
-
         # location from top left.
         # MPL figure "origin" is bottom left.
         # But loc is distance from TOP left!!
@@ -204,21 +197,39 @@ class Menu(object):
         self.y = loc[1]
         self.itemOffset = 0
 
-        self.itemWidth = maxw + 2*MenuItem.padx
-        self.itemHeight = maxh + MenuItem.pady
-
-        self.width = self.itemWidth
-        self.height = self.placeItems(self.y)
+        # this call must happen in this constructor
+        self.resize(self.menuItems)
 
         fig.canvas.mpl_connect('motion_notify_event', self.on_move)
         fig.canvas.mpl_connect('resize_event', self.onResize)
         fig.canvas.draw()
 
+    def addToMenu(self, newItems):
+        assert(isinstance(newItems, list))
+        for newItem in newItems:
+            self.menuItems.append(newItem)
+        self.resize(newItems)
+
+
+    def resize(self, newItems):
+        # Add new MenuItem(s) to the figure
+        self.figure.artists.extend(newItems)
+
+        numItems = len(self.menuItems)
+        maxw = min(max([item.labelwidth for item in self.menuItems]), Menu.signalButtonWidth)
+        maxh = max([item.labelheight for item in self.menuItems])
+        totalh = numItems*maxh + (numItems + 1)*2*MenuItem.pady
+
+        self.itemWidth = maxw + 2*MenuItem.padx
+        self.itemHeight = maxh + MenuItem.pady
+
+        self.width = self.itemWidth
+        self.height = self.placeItems(self.figure.get_figheight()*self.figure.get_dpi() - self.y)
+
     def placeItems(self, yOffset):
         for item in self.menuItems:
             bottom = yOffset - self.itemHeight - MenuItem.pady
             item.set_extent(self.x, bottom, self.itemWidth, self.itemHeight)
-            self.figure.artists.append(item)
             yOffset -= self.itemHeight + MenuItem.pady
         return yOffset
 

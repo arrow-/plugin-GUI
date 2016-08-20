@@ -1,0 +1,54 @@
+---
+holdTime: [54, 68, 684, 68, 684, 6301]
+name: sawtooth-ish
+size: 6
+sourceType: 0
+voltage: [0, 0, 0, 60, 4, 97]
+...
+---
+holdTime: [54, 68, 684, 68, 684, 6301]
+name: discover
+size: 6
+sourceType: 0
+voltage: [0, 0, 0, 60, 4, 97]
+...
+---
+holdTime: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
+    20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
+    20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+name: smallStored
+size: 50
+sourceType: 2
+voltage: [4095, 3931, 3767, 3603, 3439, 3276, 3112, 2948, 2784, 2620, 2457, 2293,
+    2129, 1965, 1801, 1638, 1474, 1310, 1146, 982, 819, 655, 491, 327, 163, 0, 163,
+    327, 491, 655, 819, 982, 1146, 1310, 1474, 1638, 1801, 1965, 2129, 2293, 2457,
+    2620, 2784, 2948, 3112, 3276, 3439, 3603, 3767, 3931]
+...
+---
+holdTime: [54, 68, 24, 454, 300, 80]
+name: veryLongNameForASignal
+size: 6
+sourceType: 0
+voltage: [0, 200, 400, 500, 60, 700]
+...
+---
+holdTime: [5, 4, 4]
+name: peerAutomate
+size: 3
+sourceType: 2
+voltage: [5, 5, 8]
+...
+---
+holdTime: [54, 68, 684, 68, 684, 6301]
+name: fractalChaos
+size: 6
+sourceType: 0
+voltage: [0, 0, 0, 60, 4, 97]
+...
+---
+holdTime: [5, 4, 4]
+name: recruitAccess
+size: 3
+sourceType: 2
+voltage: [5, 5, 8]
+...
