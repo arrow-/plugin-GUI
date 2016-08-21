@@ -262,16 +262,18 @@ def saveAll(file_handle, order, sigMap):
 def getSignalDatabase(file_path):
     if os.path.exists(file_path):
         with open(file_path, 'r') as signal_file:
-            print("\nRead Signals Database from:\n`" + file_path + '`')
+            print("* Read Signals Database from:\n> `" + file_path + '`')
+            print('~'*80)
             return parseYAML(signal_file)
     else:
         signal_file = open(file_path, 'w')
         signal_file.close()
         print("Could not find the SignalsDatabase here!\n(but we did expect it to be here, just like you did...)")
-        print("Made a new Signals Database! (signals.yaml), and also added a template signal.")
-        print("\nYou can make new signals, and save. Heck! You can even edit the file by hand!")
+        print("* Made a new Signals Database! (signals.yaml), and also added a template signal.")
+        print('-'*80,"\nYou can make new signals, and save. Heck! You can even edit the file by hand!")
         print("Not happy? Go ahead and replace this file, look in the OpenEphys GUI repo for a cool replacement!")
         s = signalIO.Signal()
+        print('~'*80)
         return [s.name], {s.name : s}
 
 def saveSignalDatabase(file_path, order, sigMap):

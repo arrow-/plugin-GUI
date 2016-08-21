@@ -21,6 +21,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.interpolate
 from copy import deepcopy
 
 import menu
@@ -53,6 +54,8 @@ class EditorGUI:
         self.ax = self.fig.add_subplot(111)
         self.ax.set_ylim(-2, 4096)
         self.ax.grid(True)
+
+        #self.handles, self.labels = self.ax.get_legend_handles_labels()
         if main_menu:
             # menu::main
             self.menuItems = [menu.MenuItem.makeMainMenuItem(self.fig, r'$New$', self.new_signal),
@@ -64,6 +67,7 @@ class EditorGUI:
         self.selected = None  # Holds the name of the signal which is currently shown on canvas.
 
         self.line, = plt.step([1], [1], where='pre')
+        self.smooth, = plt.plot([1], [1], 'g-.', lw=2)
         self.fig.canvas.mpl_connect('close_event', self.manager.onClose)
 
     def new_signal(self, menu_item):
@@ -90,23 +94,33 @@ class EditorGUI:
         item.clicked = True
         item.props.set_toDown()
         item.refresh()
-        for item in self.signalMenu.menuItems:
-            if item.labelstr == old_name:
-                break
-        item.hovering = False
-        item.clicked = False
-        item.props.set_toIdle()
-        item.refresh()
+        if new_name != old_name:
+            for item in self.signalMenu.menuItems:
+                if item.labelstr == old_name:
+                    break
+            item.hovering = False
+            item.clicked = False
+            item.props.set_toIdle()
+            item.refresh()
 
     def onSelect(self, tempSignal, menuItem=None):
         """GUI callback for mouse click on MenuItem"""
         termShow("(re)plot: " + tempSignal.name)
         if menuItem is None:
             self.refreshMenuItem(tempSignal.name, self.selected)
-        self.line.set_xdata(tempSignal._tData)
-        self.line.set_ydata(tempSignal._vData)
+        self.line.set_data(tempSignal._tData, tempSignal._vData)
+        if tempSignal.sourceType != 2:
+            interp = scipy.interpolate.UnivariateSpline(tempSignal._tData, tempSignal._vData)
+            if self.ax.lines.count(self.smooth) == 0:
+                self.smooth, = self.ax.plot(tempSignal._tData, interp(tempSignal._tData), 'g-.', lw=2)
+            else:
+                self.smooth.set_data(tempSignal._tData, interp(tempSignal._tData))
+            self.ax.legend([self.line, self.smooth], ['signal', 'smooth-spline'])
+        else:
+            self.ax.lines.remove(self.smooth)
+            self.ax.legend([self.line], ['signal'])
+        
         self.ax.set_xlim(-10, tempSignal._tData[-1]+10)
-
         self.selected = tempSignal.name
         self.fig.canvas.draw_idle()  # Not really required
 
