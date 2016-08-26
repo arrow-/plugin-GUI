@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#ifndef CYCLOPS_EDITOR_H_INCLUDED
-#define CYCLOPS_EDITOR_H_INCLUDED
+#ifndef CYCLOPS_EDITOR_H
+#define CYCLOPS_EDITOR_H
 
 #include <VisualizerEditorHeaders.h>
 #include "CyclopsCanvas.h"

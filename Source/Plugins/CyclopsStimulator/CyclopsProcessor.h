@@ -21,8 +21,8 @@
 
 */
 
-#ifndef CYCLOPS_PROCESSOR_H_INCLUDED
-#define CYCLOPS_PROCESSOR_H_INCLUDED
+#ifndef CYCLOPS_PROCESSOR_H
+#define CYCLOPS_PROCESSOR_H
 
 #ifdef _WIN32
 #include <Windows.h>

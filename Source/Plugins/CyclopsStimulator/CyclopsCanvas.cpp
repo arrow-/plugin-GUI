@@ -68,13 +68,6 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     }
     baudrateCombo->setSelectedId(115200);
     addAndMakeVisible(baudrateCombo);
-
-    // Add TEST buttons
-    for (int i=0; i < 4; i++){
-        testButtons.add(new UtilityButton(String("Test ") + String(i), Font("Default", 11, Font::bold)));
-        testButtons[i]->addListener(this);
-        addAndMakeVisible(testButtons[i]);
-    }
     
     // Add close Button
     closeButton = new UtilityButton("close", Font("Default", 9, Font::plain));
@@ -97,6 +90,11 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     signalDisplay = new SignalDisplay(this);
     signalViewport = new SignalViewport(signalDisplay);
     addAndMakeVisible(signalViewport);
+
+    ledChannelPort = new LEDChannelPort(this);
+    addAndMakeVisible(ledChannelPort);
+    for (int i=0; i<4; i++)
+        linkPaths.add(new Path());
 
     progressBar = new ProgressBar(progress);
     progressBar->setPercentageDisplay(false);
@@ -169,17 +167,16 @@ void CyclopsCanvas::resized()
     baudrateCombo->setBounds(width-75, 5, 70, 20);
     portCombo->setBounds(width-75-5-70, 5, 70, 20);
     refreshButton->setBounds(width-75-5-70-5-20, 5, 20, 20);
-    for (int i=0; i < 4; i++){
-        testButtons[i]->setBounds(jmax(100, width-53), jmax(45, (height/5))*(i+1)-(25/2), 50, 25);
-    }
+    
+    ledChannelPort->setBounds(jmax(100, width-73), 25, 70, height-25);
     progressBar->setBounds(2, height-16, width-4, 16);
     closeButton->setBounds(width/2-20, 5, 40, 20);
 
     hookLabel->setBounds(20, 5, jmax(200, width-200), 24);
-    hookViewport->setBounds(2, 30, width-100, height/2-30);
+    hookViewport->setBounds(2, 30, width-140, height/2-30);
     hookViewDisplay->setBounds( 0
                               , 0
-                              , width-100-hookViewport->getScrollBarThickness()
+                              , width-140-hookViewport->getScrollBarThickness()
                               , hookViewDisplay->height);
 
     sigLabel->setBounds(20, 30+5+height/2-30, jmax(200, width-200), 24);
@@ -253,8 +250,6 @@ void CyclopsCanvas::refresh()
 void CyclopsCanvas::disableAllInputWidgets()
 {
     // Disable the whole gui
-    for (int i=0; i<4; i++)
-        testButtons[i]->setEnabled(false);
     portCombo->setEnabled(false);
     baudrateCombo->setEnabled(false);
     refreshButton->setEnabled(false);
@@ -264,8 +259,6 @@ void CyclopsCanvas::disableAllInputWidgets()
 void CyclopsCanvas::enableAllInputWidgets()
 {
     // Reenable the whole gui
-    for (int i=0; i<4; i++)
-        testButtons[i]->setEnabled(true);
     portCombo->setEnabled(true);
     baudrateCombo->setEnabled(true);
     refreshButton->setEnabled(true);
@@ -284,29 +277,14 @@ void CyclopsCanvas::paint(Graphics& g)
         progressBar->setVisible(false);
     if (canvasList.size() > 1)
         closeButton->setVisible(true);
+    g.setColour(Colours::black);
+    for (auto& p : linkPaths){
+        g.strokePath(*p, PathStrokeType(3));
+    }
 }
 
 void CyclopsCanvas::buttonClicked(Button* button)
-{  
-    int test_index = -1;
-    for (int i=0; i < 4; i++){
-        if (button == testButtons[i]){
-            test_index = i;
-            break;
-        }
-    }
-    if (test_index >= 0){
-        disableAllInputWidgets();
-        broadcastEditorInteractivity(CanvasEvent::FREEZE);
-        std::cout << "Testing LED channel " << test_index << "\n";
-        in_a_test = true;
-        //serialInfo.Serial->testChannel(test_index);
-        progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
-        progressBar->setVisible(true);
-        startTimer(20);
-        test_index = -1;
-        //for (auto& )
-    }
+{
     if (button == refreshButton)
     {
         // Refresh list of devices
@@ -361,43 +339,30 @@ bool CyclopsCanvas::keyPressed(const KeyPress& key)
 
 void CyclopsCanvas::timerCallback()
 {
-    if (in_a_test){
-        progress += pstep;
-        if (progress >= 1.0){
-            progressBar->setVisible(false);
-            progress = 0;
-            in_a_test = false;
-            stopTimer();
-            enableAllInputWidgets();
-            broadcastEditorInteractivity(CanvasEvent::THAW);
-        }
-    }
-    else{
-        int response;
-        while (serialInfo.Serial->available() > 0){
-            response = serialInfo.Serial->readByte();
-            switch (response){
-            case 0:   //CL_RC_LAUNCH
-            break;
+    int response;
+    while (serialInfo.Serial->available() > 0){
+        response = serialInfo.Serial->readByte();
+        switch (response){
+        case 0:   //CL_RC_LAUNCH
+        break;
 
-            case 1:   //CL_RC_END
-            break;
+        case 1:   //CL_RC_END
+        break;
 
-            case 8:   //CL_RC_SBDONE
-            break;
+        case 8:   //CL_RC_SBDONE
+        break;
 
-            case 9:   //CL_RC_IDENTITY
-            break;
+        case 9:   //CL_RC_IDENTITY
+        break;
 
-            case 16:  //CL_RC_MBDONE
-            break;
+        case 16:  //CL_RC_MBDONE
+        break;
 
-            case 240: //CL_RC_EA_FAIL
-            case 241: //CL_RC_NEA_FAIL
-                devStatus->update(CyclopsColours::notResponding, "Device sent an ErrorCode.");
-                devStatus->repaint();
-            break;
-            }
+        case 240: //CL_RC_EA_FAIL
+        case 241: //CL_RC_NEA_FAIL
+            devStatus->update(CyclopsColours::notResponding, "Device sent an ErrorCode.");
+            devStatus->repaint();
+        break;
         }
     }
 }
@@ -507,6 +472,7 @@ bool CyclopsCanvas::removeHook(int node_id)
     HookView* hv = getHookView(node_id);
     if (hv == nullptr)
         return false;
+    hookViewDisplay->shownIds.removeFirstMatchingValue(node_id);
     CyclopsCanvas::hookViews.removeObject(hv, true); // deletes
     return true;
 }
@@ -528,6 +494,53 @@ bool CyclopsCanvas::isReady(int node_id)
     HookView* hv = CyclopsCanvas::getHookView(node_id);
     return hv->isReady();
 }
+
+void CyclopsCanvas::updateLink(int ledChannel, Point<int> src, Point<int> dest)
+{
+    float x1 = src.getX(), y1 = src.getY(),
+          x2 = dest.getX(), y2 = dest.getY();
+    Path* p = linkPaths[ledChannel];
+    p->clear();
+    p->startNewSubPath(x1, y1);
+    p->cubicTo(x1 + (x2 - x1) * 0.8f, y1 + (y2 - y1) * 0.05f,
+               x2 - (x2 - x1) * 0.8f, y2 - (y2 - y1) * 0.05f,
+               x2, y2);
+}
+
+void CyclopsCanvas::removeLink(int ledChannel)
+{
+    linkPaths[ledChannel]->clear();
+}
+
+void CyclopsCanvas::hideLink(int ledChannel)
+{
+
+}
+
+void CyclopsCanvas::redrawLinks()
+{
+    int hookID;
+    for (int i=0; i<4; i++){
+        hookID = ledChannelPort->connections[i];
+        if (hookID > -1){
+            Point<int> src, dest;
+            if (! hookViewport->getLinkPathSource(hookID, src)){
+                // This HookView no longer exists ('twas deleted)
+                ledChannelPort->connections.set(i, -1);
+                removeLink(i);
+            }
+            else{
+                ledChannelPort->getLinkPathDest(i, dest); // always returns true
+                updateLink (i,
+                            getLocalPoint(hookViewport, src),
+                            getLocalPoint(ledChannelPort, dest));
+            }
+        }
+    }
+    repaint();
+}
+
+
 
 void CyclopsCanvas::broadcastButtonState(CanvasEvent whichButton, bool state)
 {
@@ -623,6 +636,258 @@ void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip
     setTooltip(tooltip);
 }
 
+/*
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  |                               LED CHANNEL PORT                                |
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+*/
+
+
+LEDChannelPort::LEDChannelPort(CyclopsCanvas* parent) : canvas(parent)
+                                                      , mouseOverIndex(-1)
+                                                      , isDragging(false)
+                                                      , dragShouldDraw(true)
+{
+    Image img(Image::ARGB, 21, 21, true);
+    Graphics g(img);
+    g.setColour(Colours::black);
+    g.drawEllipse(1, 1, 16, 16, 2);
+    g.drawEllipse(5, 5, 8, 8, 4);
+    // Add buttons
+    for (int i=0; i < 4; i++){
+        testButtons.add(new UtilityButton(String("Test ") + String(i), Font("Default", 11, Font::bold)));
+        testButtons[i]->addListener(this);
+        addAndMakeVisible(testButtons[i]);
+        
+        ImageButton* imgButton = LEDButtons.add(new ImageButton());
+        imgButton->setImages( true, true, true
+                            , img, 0.9, Colours::transparentBlack
+                            , img, 0.7, Colours::lightgrey
+                            , img, 1, Colours::darkgrey);
+        imgButton->addListener(this);
+        addAndMakeVisible(imgButton);
+
+        connections.add(-1);
+    }
+}
+
+void LEDChannelPort::paint(Graphics &g)
+{
+    int heightBlock = jmax(70, getHeight()/5),
+        width = getWidth();
+    g.setColour(Colours::black);
+    bool draw = false;
+    for (int i=0; i<4; i++){
+        if (connections[i] > -1){
+            if (mouseOverIndex > -1 && mouseOverIndex == i){
+                canvas->hideLink(mouseOverIndex);
+            }
+            draw = true;
+        }
+        else if (mouseOverIndex > -1 && mouseOverIndex == i){
+            draw = true;
+        }
+        if (draw){
+            g.setColour(Colours::black);
+        }
+        else{
+            g.setColour(Colour(0xff6e6e6e));
+        }
+        g.fillRect(0, heightBlock*(i+1)-25, width/2.0+2, 4);
+        g.setColour(Colours::black);
+        draw = false;
+    }
+}
+
+void LEDChannelPort::buttonClicked(Button* button)
+{
+    int test_index = -1;
+    for (int i=0; i < 4; i++){
+        if (button == testButtons[i]){
+            test_index = i;
+            break;
+        }
+    }
+    if (test_index >= 0){
+        canvas->disableAllInputWidgets();
+        canvas->broadcastEditorInteractivity(CanvasEvent::FREEZE);
+        std::cout << "Testing LED channel " << test_index << "\n";
+        canvas->in_a_test = true;
+        //serialInfo.Serial->testChannel(test_index);
+        canvas->progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
+        canvas->progressBar->setVisible(true);
+        startTimer(20);
+        test_index = -1;
+        for (int i=0; i<4; i++)
+            testButtons[i]->setEnabled(false);
+    }
+    else{
+        test_index = -1;
+        for (int i=0; i < 4; i++){
+            if (button == LEDButtons[i]){
+                test_index = i;
+                break;
+            }
+        }
+        if (test_index >= 0 && connections[test_index] > -1){
+            HookView* hv = CyclopsCanvas::getHookView(connections[test_index]);
+            hv->hookInfo->LEDChannel = -1;
+            connections.set(test_index, -1);
+            canvas->removeLink(test_index);
+            repaint();
+            hv->repaint();
+            canvas->redrawLinks();
+        }
+    }
+}
+
+void LEDChannelPort::timerCallback()
+{
+    if (canvas->in_a_test){
+        canvas->progress += canvas->pstep;
+        if (canvas->progress >= 1.0){
+            canvas->progressBar->setVisible(false);
+            canvas->progress = 0;
+            canvas->in_a_test = false;
+            stopTimer();
+            for (int i=0; i<4; i++)
+                testButtons[i]->setEnabled(true);
+            canvas->enableAllInputWidgets();
+            canvas->broadcastEditorInteractivity(CanvasEvent::THAW);
+        }
+    }
+}
+
+void LEDChannelPort::resized()
+{
+    int heightBlock = (getHeight()/5);
+    for (int i=0; i < 4; i++){
+        testButtons[i]->setBounds(10, jmax(70, heightBlock)*(i+1)-(25/2), 50, 25);
+        LEDButtons[i]->setBounds(getWidth()/2.0-10, jmax(70, heightBlock)*(i+1)-32, 20, 20);
+    }
+}
+
+int LEDChannelPort::getIndexfromXY(const Point<int>& pos)
+{
+    int height = getHeight(),
+        x = pos.getX(),
+        y = pos.getY(),
+        index = -1;
+    if (x > 20 && y > 5 && y < 4*height/5){
+        // in Rect
+        index = (y/(float)height)*5;
+        // sanity check!
+        jassert (index < 4);
+    }
+    return index;
+}
+
+bool LEDChannelPort::getLinkPathDest(int ledChannel, Point<int>& result)
+{
+    int h = jmax(getHeight()/5, 70)*(ledChannel+1) - 32+9;
+    result.setX(0);
+    result.setY(h);
+    return true;
+}
+
+bool LEDChannelPort::isInterestedInDragSource(const SourceDetails& dragSouceDetails)
+{
+    dragDescription = dragSouceDetails.description.getArray();
+    jassert(dragDescription != nullptr);
+    if (dragDescription->getUnchecked(1).toString().startsWith("hookViewConnector"))
+        return true;
+    dragDescription = nullptr;
+    return false;
+}
+
+void LEDChannelPort::itemDragEnter(const SourceDetails& dragSouceDetails)
+{
+    isDragging = true;
+}
+
+void LEDChannelPort::itemDragMove(const SourceDetails& dragSouceDetails)
+{
+    mouseOverIndex = getIndexfromXY(dragSouceDetails.localPosition);
+    jassert(dragDescription != nullptr);
+    if (mouseOverIndex > -1)
+        dragShouldDraw = false;
+    else
+        dragShouldDraw = true;
+    repaint();
+}
+
+void LEDChannelPort::itemDragExit(const SourceDetails& dragSouceDetails)
+{
+    isDragging = false;
+    dragDescription = nullptr;
+    dragShouldDraw = true;
+    mouseOverIndex = -1;
+    repaint();
+}
+
+void LEDChannelPort::itemDropped(const SourceDetails& dragSouceDetails)
+{
+    addConnection(dragSouceDetails.sourceComponent);
+    isDragging = false;
+    dragDescription = nullptr;
+    dragShouldDraw = true;
+    mouseOverIndex = -1;
+    repaint();
+}
+
+bool LEDChannelPort::shouldDrawDragImageWhenOver()
+{
+    return dragShouldDraw;
+}
+
+void LEDChannelPort::addConnection(Component* dragSourceComponent)
+{
+    HookView* hv = dynamic_cast<HookView*>(dragSourceComponent);
+    jassert(hv != nullptr);
+    if (connections[mouseOverIndex] > -1){
+        canvas->removeLink(mouseOverIndex);
+        HookView* old_hv = CyclopsCanvas::getHookView(connections[mouseOverIndex]);
+        jassert(old_hv != nullptr);
+        old_hv->hookInfo->LEDChannel = -1;
+    }
+    hv->hookInfo->LEDChannel = mouseOverIndex;
+    connections.set(mouseOverIndex, hv->nodeId);
+    canvas->redrawLinks();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -644,8 +909,37 @@ HookViewport::HookViewport(HookViewDisplay* display) : hvDisplay(display)
     setScrollBarsShown(true, false);
 }
 
+bool HookViewport::getLinkPathSource(int nodeId, Point<int>& result)
+{
+    HookView* targetView = CyclopsCanvas::getHookView(nodeId);
+    if (targetView == nullptr){
+        // This HookView was just now deleted!, remove Links if any.
+        return false;
+    }
+    jassert(hvDisplay->isParentOf(targetView));
+    int top = getViewPositionY();
+    int height = 5;
+    for (int i=0; i<hvDisplay->shownIds.size(); i++){
+        HookView* hv = CyclopsCanvas::getHookView(hvDisplay->shownIds[i]);
+        height += hv->getHeight();
+        if (hv == targetView)
+            break;
+        height += 5;
+    }
+    int resY = height - top - targetView->getHeight()/2;
+    result.setX(getMaximumVisibleWidth()-1);
+    if (resY < 0)
+        result.setY(4);
+    else if (resY > getViewHeight())
+        result.setY(getViewHeight()-2);
+    else
+        result.setY(resY);
+    return true;
+}
+
 void HookViewport::visibleAreaChanged(const Rectangle<int>& newVisibleArea)
 {
+    hvDisplay->canvas->redrawLinks();
 }
 
 void HookViewport::paint(Graphics& g)
@@ -689,7 +983,7 @@ void HookViewDisplay::refresh()
         HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
         jassert(hv != nullptr);
         jassert(isParentOf(hv));
-        hv->setBounds(5, height, getWidth()-80, jmax(45, hv->getHeight()));
+        hv->setBounds(5, height, getWidth(), jmax(45, hv->getHeight()));
         height += jmax(45, hv->getHeight()) + 5;
         hv->repaint();
     }
@@ -705,7 +999,7 @@ void HookViewDisplay::resized()
         HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
         jassert(hv != nullptr);
         jassert(isParentOf(hv));
-        hv->setSize(getWidth()-80, jmax(45, hv->getHeight()));
+        hv->setSize(getWidth(), jmax(45, hv->getHeight()));
     }
 }
 
@@ -745,6 +1039,82 @@ void HookViewDisplay::enableAllInputWidgets()
 
 
 
+
+
+HookInfo::HookInfo(int node_id) : nodeId(node_id)
+                                , LEDChannel(-1)
+                                , pluginInfo(nullptr)
+{
+    ;
+}
+
+
+
+/*
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  |                                HOOK-CONNECTOR                                 |
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+*/
+
+HookConnector::HookConnector(HookView* hv) : isDragging(false)
+                                           , dragEnded(false)
+                                           , hookView(hv)
+{    
+}
+
+void HookConnector::resized()
+{
+    setBounds(jmax(235+5+150+2+123, hookView->getWidth()-40), 0, 40, hookView->getHeight());
+}
+
+void HookConnector::paint(Graphics &g)
+{
+    g.fillAll(Colours::darkgrey);
+    int height = getHeight();
+    if (isDragging || hookView->hookInfo->LEDChannel > -1){
+        g.setColour(Colours::black);
+        g.fillRect(18, height/2-1, 30, 4);
+    }/*
+    else if (dragEnded){
+        if (hookView->hookInfo->LEDChannel < 0){
+            g.setColour(Colours::green);
+            g.fillRect(18, height/2.0-2, 30, 4);
+        }
+        dragEnded = false;
+    }*/
+    g.setColour(Colours::black);
+    g.drawEllipse(20 - 8, height/2.0 - 8, 16, 16, 2);
+    g.drawEllipse(20 - 4, height/2.0 - 4, 8, 8, 4);
+}
+
+void HookConnector::mouseDrag(const MouseEvent &event)
+{
+    if (hookView->hookInfo->LEDChannel > -1)
+        return;
+    Array<var> dragData;
+    dragData.add(true); // user doing this live, false implies load from XML
+    dragData.add("hookViewConnector");
+    dragData.add(hookView->nodeId);
+
+    Image img (Image::ARGB, 20, 20, true);
+    Graphics g (img);
+    g.setColour(Colours::red);
+    g.fillEllipse(0, 0, 20, 20);
+    CyclopsCanvas* canvas = hookView->getParentDisplay()->canvas;
+    canvas->startDragging(dragData, hookView, img);
+    isDragging = true;
+}
+
+void HookConnector::mouseUp(const MouseEvent &event)
+{
+    isDragging = false;
+    dragEnded = true;
+    repaint();
+}
+
+
+
+
 HookView::HookView(int node_id) : nodeId(node_id)
                                 , dragShouldDraw(true)
                                 , isDragging(false)
@@ -757,6 +1127,9 @@ HookView::HookView(int node_id) : nodeId(node_id)
     hookIdLabel->setFont(Font("Default", 16, Font::plain));
     hookIdLabel->setColour(Label::textColourId, Colours::black);
     addAndMakeVisible(hookIdLabel);
+
+    hookConnector = new HookConnector(this);
+    addAndMakeVisible(hookConnector);
 
     pluginSelect = new ComboBox();
     pluginSelect->setTooltip("Select the sub-plugin for this \"hook\".");
@@ -773,7 +1146,7 @@ HookView::HookView(int node_id) : nodeId(node_id)
 
 void HookView::comboBoxChanged(ComboBox* cb)
 {
-    HookViewDisplay* parent = findParentComponentOfClass<HookViewDisplay>();
+    HookViewDisplay* parent = getParentDisplay();
     parent->canvas->unicastPluginIndicator(CanvasEvent::PLUGIN_SELECTED, nodeId);
     parent->canvas->unicastUpdatePluginInfo(nodeId);
     //std::cout << cb->getSelectedItemIndex() <<std::endl;
@@ -805,6 +1178,7 @@ void HookView::comboBoxChanged(ComboBox* cb)
     // set sizes
     setSize(parent->getWidth()-80, jmax(45, 20+20*codeLabels.size()));
     parent->refresh();
+    hookConnector->resized();
     prepareForDrag();
 }
 
@@ -900,6 +1274,7 @@ void HookView::resized()
 {
     hookIdLabel->setBounds(5, 0, 35, 30);
     pluginSelect->setBounds(40, 2, 180, 30);
+    hookConnector->resized();
     int index = 0;
     for (auto& label : codeLabels){
         label->setBounds(240, 5+20*(index++), 150, 20);
@@ -1035,23 +1410,11 @@ int  HookView::getCodeType(int index)
     return (int) (hookInfo->pluginInfo->sourceCodeTypes[index]);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-HookInfo::HookInfo(int node_id) : nodeId(node_id)
-                                , pluginInfo(nullptr)
+HookViewDisplay* HookView::getParentDisplay()
 {
-    ;
+    return findParentComponentOfClass<HookViewDisplay>();
 }
+
 
 
 

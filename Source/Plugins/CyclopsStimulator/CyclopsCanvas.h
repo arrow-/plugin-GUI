@@ -21,8 +21,8 @@
 
 */
 
-#ifndef SPIKEDISPLAYCANVAS_H_
-#define SPIKEDISPLAYCANVAS_H_
+#ifndef CYCLOPS_STIM_CANVAS_H
+#define CYCLOPS_STIM_CANVAS_H
 
 #include <VisualizerWindowHeaders.h>
 #include <VisualizerEditorHeaders.h>
@@ -69,7 +69,10 @@ struct cl_serial
 };
 
 class IndicatorLED;
+class LEDChannelPort;
+
 class HookInfo;
+class HookConnector;
 class HookView;
 class HookViewDisplay;
 class HookViewport;
@@ -169,6 +172,13 @@ public:
      */
     bool removeHook(int node_id);
 
+    void removeLink(int ledChannel);
+    void hideLink(int ledChannel);
+    void redrawLinks();
+
+    void startDrawingLine(int nodeId);
+    void stopDrawingLine();
+
     void broadcastButtonState(CanvasEvent whichButton, bool state);
     void broadcastEditorInteractivity(CanvasEvent interactivity);
     void unicastPluginIndicator(CanvasEvent pluginState, int node_id);
@@ -209,6 +219,15 @@ public:
     // serial object
     cl_serial serialInfo;
 
+    ScopedPointer<LEDChannelPort> ledChannelPort;
+
+    ScopedPointer<ProgressBar> progressBar;
+    // Some state vars for "TEST" UI
+    double progress, pstep;
+    bool in_a_test;
+    // LED links
+    OwnedArray<Path> linkPaths;
+
 private:
     
     // GUI stuff
@@ -216,7 +235,6 @@ private:
     ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device list */
     ScopedPointer<ComboBox> portCombo;          /**< List of all available dvices */
     ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
-    OwnedArray<UtilityButton> testButtons;      /**< TEST Buttons */
 
     ScopedPointer<Label> hookLabel;
     ScopedPointer<HookViewDisplay> hookViewDisplay;
@@ -226,11 +244,7 @@ private:
     ScopedPointer<SignalDisplay> signalDisplay;
     ScopedPointer<SignalViewport> signalViewport;
 
-    ScopedPointer<ProgressBar> progressBar;
-    ScopedPointer<UtilityButton> closeButton;   /**< Used to close a canvas */
-    // Some state vars for "TEST" UI
-    double progress, pstep;
-    bool in_a_test;
+    ScopedPointer<UtilityButton> closeButton;   /**< Used to close a canvas */    
 
     // listeners
     ListenerList<Listener> canvasEventListeners;
@@ -255,6 +269,16 @@ private:
      * @brief      Returns a list of all supported baudrates.
      */
     Array<int> getBaudrates();
+
+    /**
+     * @brief      Updates the "points" of the path linking the HookView with an
+     *             LED port
+     *
+     * @param[in]  ledChannel  The LED ``channel``
+     * @param[in]  src         source of path, right edge of HookView
+     * @param[in]  dest        destination of path, LEDChannelPort.
+     */
+    void updateLink(int ledChannel, Point<int> src, Point<int> dest);
     
     static CyclopsCanvas::Listener* findListenerById(CyclopsCanvas* cc, int nodeId);
 
@@ -292,6 +316,52 @@ private:
 };
 
 
+class LEDChannelPort : public Component
+                     , public DragAndDropTarget
+                     , public Timer
+                     , public Button::Listener
+{
+public:
+    LEDChannelPort(CyclopsCanvas* parent);
+    void resized();
+    void buttonClicked(Button* button);
+    void timerCallback();
+    void paint(Graphics &g);
+    bool getLinkPathDest(int ledChannel, Point<int>& result);
+
+    bool isInterestedInDragSource(const SourceDetails& dragSouceDetails);
+    void itemDragEnter(const SourceDetails& dragSouceDetails);
+    void itemDragMove(const SourceDetails& dragSouceDetails);
+    void itemDragExit(const SourceDetails& dragSouceDetails);
+    void itemDropped(const SourceDetails& dragSouceDetails);
+    bool shouldDrawDragImageWhenOver();
+
+    CyclopsCanvas* canvas;
+    OwnedArray<UtilityButton> testButtons; /**< TEST Buttons */
+    OwnedArray<ImageButton> LEDButtons;
+    Array<int> connections; // <led-channel> -> <nodeId>
+private:
+    int getIndexfromXY(const Point<int>& pos);
+    void addConnection(Component*);
+
+    Array<var>* dragDescription;
+    int mouseOverIndex;
+    bool isDragging, dragShouldDraw;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -302,6 +372,7 @@ class HookViewport : public Viewport
 {
 public:
     HookViewport(HookViewDisplay* display);
+    bool getLinkPathSource(int nodeId, Point<int>& result);
     void visibleAreaChanged(const Rectangle<int>& newVisibleArea);
     void paint(Graphics& g);
 private:
@@ -343,13 +414,26 @@ public:
 
 class HookInfo{
 public:
-    int nodeId;
+    int nodeId, LEDChannel;
     CyclopsPluginInfo* pluginInfo;
     std::vector<int> selectedSignals;
     HookInfo(int node_id);
 };
 
 
+class HookConnector : public Component
+{
+public:
+    HookConnector(HookView* hv);
+    void resized();
+    void paint(Graphics &g);
+    void mouseDrag(const MouseEvent &event);
+    void mouseUp(const MouseEvent &event);
+
+    bool isDragging, dragEnded;
+private:
+    HookView*      hookView;
+};
 
 
 
@@ -365,6 +449,7 @@ public:
     ScopedPointer<Label> hookIdLabel;
     ScopedPointer<ComboBox> pluginSelect;
     ScopedPointer<HookInfo> hookInfo;
+    ScopedPointer<HookConnector> hookConnector;
     OwnedArray<Label> codeLabels;
     OwnedArray<Label> signalLabels;
 
@@ -386,6 +471,7 @@ public:
 
     void disableAllInputWidgets();
     void enableAllInputWidgets();
+    HookViewDisplay* getParentDisplay();
 private:
     bool dragShouldDraw,
          isDragging,

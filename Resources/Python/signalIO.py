@@ -268,7 +268,7 @@ def getSignalDatabase(file_path):
     else:
         signal_file = open(file_path, 'w')
         signal_file.close()
-        print("Could not find the SignalsDatabase here!\n(but we did expect it to be here, just like you did...)")
+        print("(;ﾟ Дﾟ;) Could not find the SignalsDatabase here!\n(but we did expect it to be here, just like you did...)")
         print("* Made a new Signals Database! (signals.yaml), and also added a template signal.")
         print('-'*80,"\nYou can make new signals, and save. Heck! You can even edit the file by hand!")
         print("Not happy? Go ahead and replace this file, look in the OpenEphys GUI repo for a cool replacement!")
