@@ -89,7 +89,7 @@ private:
     CyclopsPluginInfo* pluginInfo;
     CyclopsPlugin* plugin;
 
-    bool isParticipating;
+    bool isOrphan, isPrimed, isParticipating;
     
     static int node_count;
     

@@ -75,7 +75,7 @@ public:
     /** Enables all input widgets on the editor. */
     void enableAllInputWidgets();
 
-    bool isReady();
+    void isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& flashError);
     bool isSerialConnected();
 
     /** Called to inform the editor that acquisition is about to start*/
@@ -90,8 +90,9 @@ public:
     void updateSettings();
     
     void updateIndicators(CanvasEvent LEDtype);
-    void changeCanvas(CyclopsCanvas* dest);
     CyclopsPluginInfo* refreshPluginInfo();
+    bool channelMapStatus();
+    void changeCanvas(CyclopsCanvas* dest);
     void updateButtons(CanvasEvent whichButton, bool state);
     void setInteractivity(CanvasEvent interactivity);
     int  getEditorId();
@@ -114,8 +115,6 @@ private:
 
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
-
-    bool isAlive;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsEditor);
 };

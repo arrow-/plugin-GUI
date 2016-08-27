@@ -120,7 +120,7 @@ CyclopsCanvas::~CyclopsCanvas()
 
 void CyclopsCanvas::beginAnimation()
 {
-    std::cout << "CyclopsCanvas beginning animation." << std::endl;
+    //std::cout << "CyclopsCanvas beginning animation." << std::endl;
     disableAllInputWidgets();
     if (serialInfo.portName != ""){
         // serialInfo->Serial.writeByte(<launch>);
@@ -211,9 +211,15 @@ int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, Cyclop
     listener->changeCanvas(dest);
     listener->updateButtons(CanvasEvent::COMBO_BUTTON, true);
 
+    // code generation decision map
+    src->decisionMap.erase(node_id);
+    dest->decisionMap[node_id] = false;
+
     src->removeListener(listener);
     HookView* hv = CyclopsCanvas::getHookView(node_id);
     jassert(hv != nullptr);
+    // hook LED connection reset
+    hv->hookInfo->LEDChannel = -1;
     src->hookViewDisplay->removeChildComponent(hv);
     dest->addListener(listener);
     dest->hookViewDisplay->addAndMakeVisible(hv);
@@ -263,11 +269,6 @@ void CyclopsCanvas::enableAllInputWidgets()
     baudrateCombo->setEnabled(true);
     refreshButton->setEnabled(true);
     hookViewDisplay->enableAllInputWidgets();
-}
-
-bool CyclopsCanvas::isReady()
-{
-    return hookViewDisplay->isReady() && serialInfo.portName != "";
 }
 
 void CyclopsCanvas::paint(Graphics& g)
@@ -464,6 +465,7 @@ void CyclopsCanvas::addHook(int node_id)
 {
     HookView* hv = CyclopsCanvas::hookViews.add(new HookView(node_id));
     hookViewDisplay->addAndMakeVisible(hv);
+    decisionMap[node_id] = false;
     //std::cout << "added hook" << std::endl;
 }
 
@@ -472,10 +474,72 @@ bool CyclopsCanvas::removeHook(int node_id)
     HookView* hv = getHookView(node_id);
     if (hv == nullptr)
         return false;
+    // Keep shownIds up-to-date (solves deletion-of-editor mem-leak bug)
+    // Just by updating showIds, we cleanly remove any LED Link of this HookView
     hookViewDisplay->shownIds.removeFirstMatchingValue(node_id);
     CyclopsCanvas::hookViews.removeObject(hv, true); // deletes
+    decisionMap.erase(node_id);
     return true;
 }
+
+void CyclopsCanvas::getAllSummaries(std::vector<std::bitset<CLSTIM_NUM_PARAMS> >& summaries)
+{
+    for (auto& listener : canvasEventListeners.getListeners()){
+        std::bitset<CLSTIM_NUM_PARAMS> summary;
+        getSummary(listener->getEditorId(), summary);
+        summaries.push_back(summary);
+    }
+}
+
+void CyclopsCanvas::getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary)
+{
+    HookView* hv = CyclopsCanvas::getHookView(node_id);
+    jassert(hv != nullptr);
+    hv->makeSummary(summary);
+    summary.set(CLSTIM_MAP_CH, unicastGetChannelMapStatus(node_id));
+}
+
+// This is only called by CyclopsEditor::isReadyForLaunch()
+bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
+{
+    std::bitset<CLSTIM_NUM_PARAMS> summary;
+    getSummary(node_id, summary);
+    if (decisionMap[node_id] == false){
+        decisionMap[node_id] = true;
+    }
+    isPrimed = summary.all();
+
+    // check decisionMap
+    std::map<int, bool>::iterator it;
+    for (it = decisionMap.begin(); it != decisionMap.end(); it++)
+        std::cout << it->first << " : " << it->second << "\n";
+
+    for (it = decisionMap.begin(); it != decisionMap.end(); it++){
+        if (it->second == false)
+            break;
+    }
+    if (it == decisionMap.end()){
+        // successfully checked all listeners
+        for (it = decisionMap.begin(); it != decisionMap.end(); it++)
+            it->second = false;
+        return true; // continue with code gen
+    }
+    return false;
+}
+
+bool CyclopsCanvas::generateCode(int& genError)
+{
+    genError = 0;
+    return true;
+}
+
+bool CyclopsCanvas::flashDevice(int& flashError)
+{
+    flashError = 0;
+    return true;
+}
+
+
 
 HookView* CyclopsCanvas::getHookView(int node_id)
 {
@@ -487,12 +551,6 @@ HookView* CyclopsCanvas::getHookView(int node_id)
         }
     }
     return res;
-}
-
-bool CyclopsCanvas::isReady(int node_id)
-{
-    HookView* hv = CyclopsCanvas::getHookView(node_id);
-    return hv->isReady();
 }
 
 void CyclopsCanvas::updateLink(int ledChannel, Point<int> src, Point<int> dest)
@@ -562,6 +620,12 @@ void CyclopsCanvas::unicastUpdatePluginInfo(int node_id)
 {
     CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
     listener->refreshPluginInfo();
+}
+
+bool CyclopsCanvas::unicastGetChannelMapStatus(int node_id)
+{
+    CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
+    return listener->channelMapStatus();
 }
 
 void CyclopsCanvas::broadcastNewCanvas()
@@ -912,7 +976,7 @@ HookViewport::HookViewport(HookViewDisplay* display) : hvDisplay(display)
 bool HookViewport::getLinkPathSource(int nodeId, Point<int>& result)
 {
     HookView* targetView = CyclopsCanvas::getHookView(nodeId);
-    if (targetView == nullptr){
+    if (targetView == nullptr || !(hvDisplay->isParentOf(targetView))) {
         // This HookView was just now deleted!, remove Links if any.
         return false;
     }
@@ -1003,16 +1067,6 @@ void HookViewDisplay::resized()
     }
 }
 
-bool HookViewDisplay::isReady()
-{
-    for (int i=0; i<shownIds.size(); i++){
-        HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
-        if (!hv->isReady())
-            return false;
-    }
-    return true;
-}
-
 void HookViewDisplay::disableAllInputWidgets()
 {
     for (int i=0; i<shownIds.size(); i++){
@@ -1089,7 +1143,7 @@ void HookConnector::paint(Graphics &g)
 
 void HookConnector::mouseDrag(const MouseEvent &event)
 {
-    if (hookView->hookInfo->LEDChannel > -1)
+    if (hookView->hookInfo->pluginInfo == nullptr || hookView->hookInfo->LEDChannel > -1)
         return;
     Array<var> dragData;
     dragData.add(true); // user doing this live, false implies load from XML
@@ -1290,11 +1344,20 @@ void HookView::refresh()
     repaint();
 }
 
-bool HookView::isReady()
+void HookView::makeSummary(std::bitset<CLSTIM_NUM_PARAMS>& summary)
 {
     if (hookInfo->pluginInfo == nullptr)
-        return false;
-    return true;
+        return;
+    // LED output port is connected?
+    if (hookInfo->LEDChannel > 0){
+        summary.set(CLSTIM_MAP_LED);
+    }
+    // sanity check assertion, ignore.
+    jassert(hookInfo->pluginInfo->sourceCount == (int)hookInfo->selectedSignals.size());
+    // SignalMap completely configured?
+    if (! (std::find(hookInfo->selectedSignals.begin(), hookInfo->selectedSignals.end(), -1) != hookInfo->selectedSignals.end()) ){
+        summary.set(CLSTIM_MAP_SIG);
+    }
 }
 
 void HookView::timerCallback()

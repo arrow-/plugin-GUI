@@ -29,6 +29,8 @@ namespace cyclops {
 int CyclopsProcessor::node_count = 0;
 
 CyclopsProcessor::CyclopsProcessor() : GenericProcessor("Cyclops Stimulator")
+                                     , isOrphan(false)
+                                     , isPrimed(false)
                                      , isParticipating(false)
 {
     node_count++;
@@ -69,12 +71,18 @@ void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int sample
 bool CyclopsProcessor::isReady()
 {
     CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
-    if (!cl_editor->isReady()){
-        editor->makeVisible();
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Prepare this hook", "Please configure this (" + String(nodeId) + ") Cyclops Stimulator-hook correctly!");
-        return false;
+    int genError, flashError;
+
+    cl_editor->isReadyForLaunch(isOrphan, isPrimed, genError, flashError);
+    if (!isOrphan && isPrimed && cl_editor->isSerialConnected()){
+        pluginInfo = cl_editor->refreshPluginInfo();
+        serialInfo = cl_editor->getSerial();
+        plugin = pluginInfo->CyclopsPluginFactory();
+
+        isParticipating = true;
     }
-    return true;
+    std::cout << nodeId << "| orph-prime-genE-flE-Part : " << isOrphan << isPrimed << genError << flashError << isParticipating << "\n";
+    return ((genError == 0) && (flashError == 0));
 }
 
 void CyclopsProcessor::timerCallback()
@@ -89,20 +97,15 @@ void CyclopsProcessor::updateSettings()
 
 bool CyclopsProcessor::enable()
 {
-    CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
-    pluginInfo = cl_editor->refreshPluginInfo();
-    serialInfo = cl_editor->getSerial();
-    plugin = pluginInfo->CyclopsPluginFactory();
-    if (pluginInfo == nullptr || plugin == nullptr || serialInfo == nullptr)
-        return false;
-    std::cout << "Name     : " << pluginInfo->Name << std::endl;
-    std::cout << "sources  : " << pluginInfo->sourceCount << std::endl;
-    std::cout << "channels : " << pluginInfo->channelCount << std::endl;
-    if (cl_editor->isSerialConnected()){
+    if (isParticipating){
+        std::cout << "Name     : " << pluginInfo->Name << "\n";
+        std::cout << "sources  : " << pluginInfo->sourceCount << "\n";
+        std::cout << "channels : " << pluginInfo->channelCount << "\n";
+        // DANGEROUS!
         startTimer(pluginInfo->timePeriod);
-        isParticipating = true;
+        return true;
     }
-    return true;
+    return false;
 }
 
 bool CyclopsProcessor::disable()

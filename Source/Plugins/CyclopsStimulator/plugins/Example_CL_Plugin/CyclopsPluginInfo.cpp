@@ -49,7 +49,7 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     // This array holds the "type" information of the sources listed above.
     infoStruct.sourceCodeTypes = { cyclops::sourceType::SQUARE
                                  , cyclops::sourceType::SQUARE
-                                 , cyclops::sourceType::GENERATED
+                                 , cyclops::sourceType::STORED
                                  , cyclops::sourceType::STORED};
 
     infoStruct.CyclopsPluginFactory = maker_function;

@@ -30,7 +30,6 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     //, progress(0, 1.0, 1000)
     , serialLED(new IndicatorLED(CyclopsColours::disconnected, Colours::black))
     , readinessLED(new IndicatorLED(CyclopsColours::notReady, Colours::black))
-    , isAlive(true)
 {
     processor = static_cast<CyclopsProcessor*>(parentNode);
     if (processor->getProcessorCount() == 1){
@@ -276,9 +275,34 @@ void CyclopsEditor::enableAllInputWidgets()
     canvasCombo->setEnabled(true);
 }
 
-bool CyclopsEditor::isReady()
+void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& flashError)
 {
-    return isAlive && CyclopsCanvas::isReady(nodeId);
+    if (connectedCanvas == nullptr){
+        isOrphan = true;
+        isPrimed = false;
+        genError = flashError = 0;
+    }
+    else{
+        isOrphan = false;
+        if (connectedCanvas->getSummary(nodeId, isPrimed)){
+            if (connectedCanvas->generateCode(genError)){
+                std::cout << "Generated" << "\n";
+                if (connectedCanvas->flashDevice(flashError)){
+                    std::cout << "Flashed" << "\n";
+                }
+                else{
+                    std::cout << "Flash FAIL" << "\n";
+                }
+            }
+            else{
+                std::cout << "Generation FAIL" << "\n";
+                flashError = 0;
+            }
+        }
+        else{
+            genError = flashError = 0;
+        }
+    }        
 }
 
 bool CyclopsEditor::isSerialConnected()
@@ -326,6 +350,16 @@ void CyclopsEditor::updateIndicators(CanvasEvent event)
     readinessLED->repaint();
 }
 
+bool CyclopsEditor::channelMapStatus()
+{
+    return true;
+}
+
+CyclopsPluginInfo* CyclopsEditor::refreshPluginInfo()
+{
+    return connectedCanvas->getPluginInfoById(nodeId);
+}
+
 void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
 {
     connectedCanvas = dest;
@@ -333,13 +367,7 @@ void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
         disableAllInputWidgets();
         tabSelector->setEnabled(false);
         windowSelector->setEnabled(false);
-        isAlive = false;
     }
-}
-
-CyclopsPluginInfo* CyclopsEditor::refreshPluginInfo()
-{
-    return connectedCanvas->getPluginInfoById(nodeId);
 }
 
 void CyclopsEditor::updateButtons(CanvasEvent whichButton, bool state)

@@ -24,12 +24,20 @@
 #ifndef CYCLOPS_STIM_CANVAS_H
 #define CYCLOPS_STIM_CANVAS_H
 
+#define CLSTIM_NUM_PARAMS  3
+#define CLSTIM_MAP_CH      0
+#define CLSTIM_MAP_SIG     1
+#define CLSTIM_MAP_LED     2
+
 #include <VisualizerWindowHeaders.h>
 #include <VisualizerEditorHeaders.h>
 #include <EditorHeaders.h>
 #include <SerialLib.h>
 #include <string>
 #include <vector>
+#include <bitset>
+#include <map>
+#include <algorithm>
 
 #include "plugin_manager/CLPluginManager.h"
 
@@ -96,6 +104,7 @@ public:
     public:
         virtual void updateIndicators(CanvasEvent LEDtype) = 0;
         virtual CyclopsPluginInfo* refreshPluginInfo() = 0;
+        virtual bool channelMapStatus() = 0;
         virtual void changeCanvas(CyclopsCanvas* dest) = 0;
         virtual void updateButtons(CanvasEvent whichButton, bool state) = 0;
         virtual void setInteractivity(CanvasEvent interactivity) = 0;
@@ -119,8 +128,6 @@ public:
     void disableAllInputWidgets();
     /** Enables all input widgets on the editor. */
     void enableAllInputWidgets();
-    
-    bool isReady();
 
     void paint(Graphics& g);
 
@@ -172,17 +179,22 @@ public:
      */
     bool removeHook(int node_id);
 
+    void getAllSummaries(std::vector<std::bitset<CLSTIM_NUM_PARAMS> >& summaries);
+    bool getSummary(int node_id, bool& isPrimed);
+    void getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary);
+
+    bool generateCode(int& genError);
+    bool flashDevice(int& flashError);
+
     void removeLink(int ledChannel);
     void hideLink(int ledChannel);
     void redrawLinks();
-
-    void startDrawingLine(int nodeId);
-    void stopDrawingLine();
 
     void broadcastButtonState(CanvasEvent whichButton, bool state);
     void broadcastEditorInteractivity(CanvasEvent interactivity);
     void unicastPluginIndicator(CanvasEvent pluginState, int node_id);
     void unicastUpdatePluginInfo(int node_id);
+    bool unicastGetChannelMapStatus(int node_id);
     int  getNumListeners();
 
     /** Saves parameters as XML */
@@ -204,7 +216,6 @@ public:
     static void dropEditor(CyclopsCanvas* closingCanvas, int node_id);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow=true);
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId);
-    static bool isReady(int node_id);
     
     static ScopedPointer<CyclopsPluginManager> pluginManager;
     static OwnedArray<CyclopsCanvas> canvasList;
@@ -215,9 +226,17 @@ public:
                     * purpose. This does not appear on the tab. */
     int realIndex; /** < This is the "real" name of the Canvas, which appears on the
                     * tab, dropwdowns, etc. */
-    ScopedPointer<DataWindow> dataWindow;
-    // serial object
-    cl_serial serialInfo;
+    ScopedPointer<DataWindow> dataWindow; /** < The dataWindow is _owned_ by this canvas, unlike DataWindows of
+                                           * other plugins. This is the only way editors can "share" it.
+                                           * Editors create/destroy DataWindow when the SelectorButton is
+                                           * pressed or the editor is deleted. When the DataWindow is owned by
+                                           * an editor, how would it pass ownership when it is deleted, so
+                                           * that window is not destroyed with it, to a sibling editor (if
+                                           * any)? <br> We simply let the canvas own it. Unfortunately, the
+                                           * window can only be created and destroyed by VisualizerEditor only (not
+                                           * the Canvas), and for those operations we pass ownership around. */
+    cl_serial serialInfo;   /** < Contains information on the serial port config, as well as the
+                             * Serial Object. */
 
     ScopedPointer<LEDChannelPort> ledChannelPort;
 
@@ -228,6 +247,8 @@ public:
     // LED links
     OwnedArray<Path> linkPaths;
 
+    // Code Generation Decision Array
+    std::map<int, bool> decisionMap;
 private:
     
     // GUI stuff
@@ -250,7 +271,7 @@ private:
     ListenerList<Listener> canvasEventListeners;
 
     static const int BAUDRATES[12];
-    static int numCanvases;
+    static int numCanvases;   /**< Just used to provide a unique ``CyclopsCanvas::realIndex`` */
 
     /**
      * @brief      Filters only relevant serial ports (by name).
@@ -393,7 +414,6 @@ public:
     void paint(Graphics& g);
     void refresh();
     void resized();
-    bool isReady();
     void disableAllInputWidgets();
     void enableAllInputWidgets();
 
@@ -458,7 +478,7 @@ public:
     void refresh();
     void paint(Graphics& g);
     void resized();
-    bool isReady();
+    void makeSummary(std::bitset<CLSTIM_NUM_PARAMS>& summary);
 
     void timerCallback();
 
