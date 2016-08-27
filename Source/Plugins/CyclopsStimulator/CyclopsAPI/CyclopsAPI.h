@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include "yaml-cpp/yaml.h"
 
 /*
 Field       | Bits  | Description
@@ -115,8 +116,6 @@ public:
     int size;
     std::string name;
     Array<int> voltage, holdTime;
-
-    bool read(std::ifstream& file);
 
     static OwnedArray<CyclopsSignal> signals;
     static void readSignals(std::ifstream& inFile);

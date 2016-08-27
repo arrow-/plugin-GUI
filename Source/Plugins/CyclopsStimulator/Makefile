@@ -14,7 +14,7 @@ OBJ := $(addprefix $(OBJDIR)/,$(notdir $(SRC:.cpp=.o)))
 
 #Extra macros and libraries needed by the plugin
 CXXFLAGS := $(CXXFLAGS) -Wall
-#LDFLAGS := $(LDFLAGS) -lExampleLib
+LDFLAGS := $(LDFLAGS) -lyaml-cpp
 
 
 

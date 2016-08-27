@@ -1,6 +1,42 @@
 #include "CyclopsAPI.h"
 #include <string.h>
 
+
+namespace YAML {
+template<>
+struct convert<cyclops::CyclopsSignal> {
+  static Node encode(const cyclops::CyclopsSignal& rhs) {
+    Node node;
+    node["name"] = rhs.name;
+    node["type"] = rhs.type;
+    node["size"] = rhs.size;
+    for (int i=0; i<rhs.size; i++){
+        node["voltage"].push_back(rhs.voltage[i]);
+        node["holdTime"].push_back(rhs.holdTime[i]);
+    }
+    return node;
+  }
+
+  static bool decode(const Node& node, cyclops::CyclopsSignal& rhs) {
+    if(!node.IsMap() || node.size() != 5) {
+      return false;
+    }
+
+    rhs.name = node["name"].as<std::string>();
+    rhs.type = node["sourceType"].as<int>();
+    rhs.size = node["size"].as<int>();
+    rhs.voltage.clear();
+    rhs.holdTime.clear();
+    for (int i=0; i<rhs.size; i++){
+        rhs.voltage.add(node["voltage"][i].as<int>());
+        rhs.holdTime.add(node["holdTime"][i].as<int>());
+    }
+    return true;
+  }
+};
+}
+
+
 namespace cyclops
 {
 
@@ -33,38 +69,16 @@ inline static uint8_t getMultiByteHeader (int _channel)
 OwnedArray<CyclopsSignal> CyclopsSignal::signals;
 bool CyclopsSignal::isPrepared = false;
 
-bool CyclopsSignal::read(std::ifstream& file)
-{
-    try{
-        file >> type >> name >> size;
-        for (int i=0; i<size; i++){
-            int timeVal;
-            file >> timeVal;
-            holdTime.add(timeVal);
-        }
-        for (int i=0; i<size; i++){
-            int voltageVal;
-            file >> voltageVal;
-            voltage.add(voltageVal);
-        }
-        return true;
-    }
-    catch (std::ifstream::failure e){
-        return false;
-    }
-}
-
 void CyclopsSignal::readSignals(std::ifstream& inFile)
 {
     if (!isPrepared){
-        inFile.exceptions(std::ifstream::eofbit | std::ifstream::badbit | std::ifstream::failbit);
-        while (true){
-            CyclopsSignal *cs = new CyclopsSignal();
-            if (cs->read(inFile))
-                CyclopsSignal::signals.add(cs);
-            else
-                break;
+        //inFile.exceptions(std::ifstream::eofbit | std::ifstream::badbit | std::ifstream::failbit);
+        YAML::Node signalYAML = YAML::Load(inFile);
+        for (int i = 0; i < (int)signalYAML.size(); i++){
+            CyclopsSignal* cs = new CyclopsSignal(signalYAML[i].as<CyclopsSignal>());
+            CyclopsSignal::signals.add(cs);
         }
+        isPrepared = true;
     }
 }
 

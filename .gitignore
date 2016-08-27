@@ -121,3 +121,7 @@ Introjucer/Builds/MacOSX/build
 build/
 
 /Builds/MacOSX/Plugins/Config/Env.xcconfig
+
+# 10. Python compiled bytecode
+*.pyc
+*__pycache__*

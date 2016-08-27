@@ -1524,10 +1524,10 @@ void SignalView::dragDone(SignalButton* sb)
 SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
                                                 , isDragging(false)
 {
-    File sigFile = getSignalsFile("cyclops_plugins/signals.txt");
-    std::cout << "Fecthing signals.txt from `" << sigFile.getFullPathName() << "`\n";
+    File sigFile = getSignalsFile("cyclops_plugins/signals.yaml");
+    std::cout << "Fecthing signals.yaml from `" << sigFile.getFullPathName() << "`\n";
     if (!sigFile.existsAsFile()){
-        std::cout << "Signals File not found! Expected @ Builds/Linux/build/cyclops_plugins/signals.txt";
+        std::cout << "Signals File not found! Expected @ Builds/Linux/build/cyclops_plugins/signals.yaml";
         std::cout << "\nPerhaps you forgot to compile Cyclops (sub) Plugins?\n" << std::endl;
         jassert(false);
     }
@@ -1538,7 +1538,7 @@ SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
             std::cout << "Signals Collection created!\n\n";
         }
         else{
-            std::cout << "Error in opening `Builds/Linux/build/cyclops_plugins/signals.txt`\nCheck if you have permissions to this file.\n" << std::endl;
+            std::cout << "Error in opening `Builds/Linux/build/cyclops_plugins/signals.yaml`\nCheck if you have permissions to this file.\n" << std::endl;
             jassert(false);
         }
         inFile.close();

@@ -227,37 +227,17 @@ def makePathTable(args):
             path_table['sig_file'] = os.path.join(path_table['source_dir'], "signals.yaml")
     return path_table
 
-def parseTxt(file_handle):
-    sig_map = {}
-    orig_ordered_name_list = []
-    # type name size holdTime[size] voltage[size]
-    lines = file_handle.readlines()
-    line = 0
-    while (line+4 < len(lines)):
-        t = int(lines[line].strip())
-        name = lines[line+1].strip()
-        sz = int(lines[line+2].strip())
-        ht = [int(x) for x in lines[line+3].strip().split(' ')]
-        v = [int(x) for x in lines[line+4].strip().split(' ')]
-        sig_map[name] = Signal(name, t, sz, ht, v)
-        line += 5
-        orig_ordered_name_list.append(name)
-    return sig_map
-
 def parseYAML(file_handle):
     sig_map = {}
+    orig_list = yaml.load(file_handle)
     orig_ordered_name_list = []
-    for x in yaml.load_all(file_handle):
-        sig_map[x['name']] = Signal(**x)
-        orig_ordered_name_list.append(x['name'])
+    for sig in orig_list:
+        sig_map[sig['name']] = Signal(**sig)
+        orig_ordered_name_list.append(sig['name'])
     return orig_ordered_name_list, sig_map
 
-def saveYAML(file_handle, signal):
-    return yaml.dump(signal.getYAML(), file_handle, width=80, indent=4, explicit_start=True, explicit_end=True)
-
 def saveAll(file_handle, order, sigMap):
-    for name in order:
-        saveYAML(file_handle, sigMap[name])
+    return yaml.dump([sigMap[name].getYAML() for name in order], file_handle, width=80, indent=4, explicit_start=True, explicit_end=True)
 
 def getSignalDatabase(file_path):
     if os.path.exists(file_path):
