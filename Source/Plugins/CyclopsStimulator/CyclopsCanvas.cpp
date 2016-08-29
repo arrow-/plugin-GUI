@@ -529,6 +529,10 @@ bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
 
 bool CyclopsCanvas::generateCode(int& genError)
 {
+    int numHooks = getNumListeners();
+    std::vector<std::bitset<CLSTIM_NUM_PARAMS> > summaries(numHooks);
+    getAllSummaries(summaries);
+    for 
     genError = 0;
     return true;
 }

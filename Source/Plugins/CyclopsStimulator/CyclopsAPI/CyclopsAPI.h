@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <fstream>
 #include "yaml-cpp/yaml.h"
 
@@ -115,10 +116,12 @@ public:
     int type;
     int size;
     std::string name;
-    Array<int> voltage, holdTime;
+    std::vector<int> voltage, holdTime;
 
     static OwnedArray<CyclopsSignal> signals;
+
     static void readSignals(std::ifstream& inFile);
+    static const CyclopsSignal& getSignalByIndex(int index);
 private:
     static bool isPrepared;
 };

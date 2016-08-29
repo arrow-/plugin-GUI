@@ -1,5 +1,5 @@
-#ifndef CYCLOPS_STIMULATOR_PLUGIN_H
-#define CYCLOPS_STIMULATOR_PLUGIN_H
+#ifndef CL_PLUGIN_INFO_H
+#define CL_PLUGIN_INFO_H
 /*+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
   |                             CyclopsPluginInfo                                      |
   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+

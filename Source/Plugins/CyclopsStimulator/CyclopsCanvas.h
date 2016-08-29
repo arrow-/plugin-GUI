@@ -221,25 +221,30 @@ public:
     static OwnedArray<CyclopsCanvas> canvasList;
     static OwnedArray<HookView> hookViews;
 
-    int tabIndex;  /** < This is used for VisualizerEditor, don't try to use this
-                    * variable, unless absolutely sure that you understand it's
-                    * purpose. This does not appear on the tab. */
-    int realIndex; /** < This is the "real" name of the Canvas, which appears on the
-                    * tab, dropwdowns, etc. */
-    ScopedPointer<DataWindow> dataWindow; /** < The dataWindow is _owned_ by this canvas, unlike DataWindows of
-                                           * other plugins. This is the only way editors can "share" it.
-                                           * Editors create/destroy DataWindow when the SelectorButton is
-                                           * pressed or the editor is deleted. When the DataWindow is owned by
-                                           * an editor, how would it pass ownership when it is deleted, so
-                                           * that window is not destroyed with it, to a sibling editor (if
-                                           * any)? <br> We simply let the canvas own it. Unfortunately, the
-                                           * window can only be created and destroyed by VisualizerEditor only (not
-                                           * the Canvas), and for those operations we pass ownership around. */
-    cl_serial serialInfo;   /** < Contains information on the serial port config, as well as the
-                             * Serial Object. */
+    /** This is used for VisualizerEditor, don't try to use this variable,
+     * unless absolutely sure that you understand it's purpose. This does not
+     * appear on the tab. */
+    int tabIndex;
+
+    /** This is the "real" name of the Canvas, which appears on the tab,
+     * dropwdowns, etc. */
+    int realIndex;
+     /** The dataWindow is _owned_ by this canvas, unlike DataWindows of other
+      * plugins. This is the only way editors can "share" it. Editors
+      * create/destroy DataWindow when the SelectorButton is pressed or the
+      * editor is deleted. When the DataWindow is owned by an editor, how would
+      * it pass ownership when it is deleted, so that window is not destroyed
+      * with it, to a sibling editor (if any)? <br> We simply let the canvas own
+      * it. Unfortunately, the window can only be created and destroyed by
+      * VisualizerEditor only (not the Canvas), and for those operations we pass
+      * ownership around. */
+    ScopedPointer<DataWindow> dataWindow;
+    
+    /** Contains information on the serial port config, as well as the Serial
+     * Object. */
+    cl_serial serialInfo;
 
     ScopedPointer<LEDChannelPort> ledChannelPort;
-
     ScopedPointer<ProgressBar> progressBar;
     // Some state vars for "TEST" UI
     double progress, pstep;
@@ -271,7 +276,8 @@ private:
     ListenerList<Listener> canvasEventListeners;
 
     static const int BAUDRATES[12];
-    static int numCanvases;   /**< Just used to provide a unique ``CyclopsCanvas::realIndex`` */
+    /** Just used to provide a unique ``CyclopsCanvas::realIndex`` */
+    static int numCanvases;
 
     /**
      * @brief      Filters only relevant serial ports (by name).

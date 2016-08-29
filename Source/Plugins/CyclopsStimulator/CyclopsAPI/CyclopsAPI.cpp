@@ -28,8 +28,8 @@ struct convert<cyclops::CyclopsSignal> {
     rhs.voltage.clear();
     rhs.holdTime.clear();
     for (int i=0; i<rhs.size; i++){
-        rhs.voltage.add(node["voltage"][i].as<int>());
-        rhs.holdTime.add(node["holdTime"][i].as<int>());
+        rhs.voltage.push_back(node["voltage"][i].as<int>());
+        rhs.holdTime.push_back(node["holdTime"][i].as<int>());
     }
     return true;
   }
@@ -82,6 +82,10 @@ void CyclopsSignal::readSignals(std::ifstream& inFile)
     }
 }
 
+const CyclopsSignal& getSignalByIndex(int index)
+{
+    return CyclopsSignal::signals[index];
+}
 
 
 
