@@ -45,7 +45,7 @@ void DataWindow::closeButtonPressed()
 {
     setContentNonOwned(0,false);
     setVisible(false);
-    controlButton->setToggleState(false, dontSendNotification);
+    controlButton->setToggleState(false,dontSendNotification);
     // with the BailOutChecker, it is safe to "delete" a DataWindow instance
     // from this callback/listener. This would (typically) not be done, because instances
     // of DataWindow are (typically) "owned" by Editors, and will be deleted

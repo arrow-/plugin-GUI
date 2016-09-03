@@ -39,8 +39,9 @@ class DataWindow : public DocumentWindow
 public:
     DataWindow(Button* button, String name);
     ~DataWindow();
-
+    
     void closeButtonPressed();
+    
     class Listener
     {
     public:
