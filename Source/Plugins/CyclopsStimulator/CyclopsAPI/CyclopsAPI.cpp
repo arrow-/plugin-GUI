@@ -84,7 +84,7 @@ void CyclopsSignal::readSignals(std::ifstream& inFile)
 
 const CyclopsSignal& getSignalByIndex(int index)
 {
-    return CyclopsSignal::signals[index];
+    return *(CyclopsSignal::signals[index]);
 }
 
 

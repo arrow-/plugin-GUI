@@ -1,12 +1,22 @@
 #ifndef OE_CYCLOPS_PLUGIN_H
 #define OE_CYCLOPS_PLUGIN_H
 
+#ifdef WIN32
+    #ifdef OE_CL_PLUGIN
+        #define CL_SUBPLUGIN_API __declspec(dllimport)
+    #else
+        #define CL_SUBPLUGIN_API __declspec(dllexport)
+    #endif
+#else
+    #define CL_SUBPLUGIN_API __attribute__((visibility("default")))
+#endif
+
 #include "../../../../JuceLibraryCode/JuceHeader.h"
 #include "../CyclopsAPI/CyclopsAPI.h"
 
 namespace cyclops{
 
-class CyclopsPluginInfo;
+class CL_SUBPLUGIN_API CyclopsPluginInfo;
 
 /*+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
   |                                 CyclopsSource                                      |
@@ -31,7 +41,7 @@ struct CyclopsSource
   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
 */
 
-class CyclopsPlugin
+class CL_SUBPLUGIN_API CyclopsPlugin
 {
     enum class pluginStatus : int
     {

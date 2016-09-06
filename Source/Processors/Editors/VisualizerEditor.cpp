@@ -331,11 +331,6 @@ void VisualizerEditor::loadCustomParameters (XmlElement* xml)
     }
 }
 
-void VisualizerEditor::windowClosed()
-{
-    std::cout<<"closing ve"<<std::endl;
-}
-
 void VisualizerEditor::makeNewWindow()
 {
     dataWindow = new DataWindow (windowSelector, tabText);

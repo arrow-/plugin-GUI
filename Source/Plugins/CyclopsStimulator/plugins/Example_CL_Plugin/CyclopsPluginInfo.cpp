@@ -1,12 +1,16 @@
-#include "../plugin_manager/CyclopsPluginInfo.h"
+#include "../../plugin_manager/CyclopsPluginInfo.h"
 #include "Example_CL_Plugin.h"
 #include <string>
 #include <vector>
 #ifdef WIN32
-#include <Windows.h>
-#define EXPORT __declspec(dllexport)
+  #include <Windows.h>
+  #define EXPORT __declspec(dllexport)
 #else
-#define EXPORT
+  #if __GNUC__ >= 4
+    #define EXPORT __attribute__ ((visibility ("default")))
+  #else
+    #define EXPORT
+  #endif
 #endif
 
 /**
@@ -34,7 +38,7 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     // Name of your Cyclops SubPlugin. This will appear on the GUI.
     infoStruct.Name = "Example_CL_Plugin";
 
-    // The no. of LED channels that will be controlled.
+    // The no. of input data channels that will be monitored for events.
     infoStruct.channelCount = 1;
     // The no. of Sources needed on the Teensy, should be same as length of the vector below.
     infoStruct.sourceCount = 4;
@@ -59,3 +63,12 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     infoStruct.timePeriod = 250; // ms
 }
 
+#ifdef WIN32
+BOOL WINAPI DllMain(IN HINSTANCE hDllHandle,
+    IN DWORD     nReason,
+    IN LPVOID    Reserved)
+{
+    return TRUE;
+}
+
+#endif
