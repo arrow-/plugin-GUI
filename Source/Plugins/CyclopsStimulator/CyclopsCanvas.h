@@ -24,11 +24,6 @@
 #ifndef CYCLOPS_STIM_CANVAS_H
 #define CYCLOPS_STIM_CANVAS_H
 
-#define CLSTIM_NUM_PARAMS  3
-#define CLSTIM_MAP_CH      0
-#define CLSTIM_MAP_SIG     1
-#define CLSTIM_MAP_LED     2
-
 #include <VisualizerWindowHeaders.h>
 #include <VisualizerEditorHeaders.h>
 #include <EditorHeaders.h>
@@ -40,6 +35,7 @@
 #include <algorithm>
 
 #include "plugin_manager/CLPluginManager.h"
+#include "code_gen/Programs.h"
 
 namespace cyclops {
     namespace CyclopsColours{
@@ -75,6 +71,7 @@ struct cl_serial
         baudRate = -1;
     }
 };
+class CyclopsProgram;
 
 class IndicatorLED;
 class LEDChannelPort;
@@ -179,11 +176,32 @@ public:
      */
     bool removeHook(int node_id);
 
-    void getAllSummaries(std::vector<std::bitset<CLSTIM_NUM_PARAMS> >& summaries);
+    void getAllSummaries(std::vector<code::CyclopsHookConfig>& hookInfoList, Array<std::bitset<CLSTIM_NUM_PARAMS> >& summaries);
     bool getSummary(int node_id, bool& isPrimed);
-    void getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary);
 
+    /**
+     * @brief      Attempts to generate the code, and a unique hash-code for the
+     *             current configuration.
+     *
+     * @param      genError  The error-code representing error during code
+     *                       generation. ``0`` if no error occured, ``Positive``
+     *                       otherwise.
+     *
+     * @return     ``true`` if we must move to the next step in
+     *             "experiment-launch", ``false`` otherwise.
+     */
     bool generateCode(int& genError);
+
+    /**
+     * @brief      Reads the status of ``CyclopsCanvas::program``, and attempts
+     *             flashing.
+     *
+     * @param      flashError  The error-code to represent flashing failure.
+     *                         Positive if flashing failed.
+     *
+     * @return     ``true`` if we must move to the next step in the
+     *             "experiment-launch", ``false`` otherwise.
+     */
     bool flashDevice(int& flashError);
 
     void removeLink(int ledChannel);
@@ -252,6 +270,7 @@ public:
     // LED links
     OwnedArray<Path> linkPaths;
 
+    ScopedPointer<code::CyclopsProgram> program;
     // Code Generation Decision Array
     std::map<int, bool> decisionMap;
 private:
@@ -307,6 +326,8 @@ private:
      */
     void updateLink(int ledChannel, Point<int> src, Point<int> dest);
     
+    HookInfo* getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary);
+
     static CyclopsCanvas::Listener* findListenerById(CyclopsCanvas* cc, int nodeId);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsCanvas);

@@ -75,6 +75,28 @@ public:
     /** Enables all input widgets on the editor. */
     void enableAllInputWidgets();
 
+    /*
+     * @brief      Determines if processor is ready for launch.
+     * @details    Call Graph:
+     *             * ProcessorGraph::enableProcessors() [loops through all
+     *               processors]
+     *             * CyclopsProcessor.isReady()
+     *             * this()
+     *             * CyclopsCanvas::getSummary(int, bool&)
+     *             * CyclopsCanvas::generateCode() [if getSummary() returns
+     *               ``true``]
+     *             * CyclopsCanvas::flashDevice() [if generateCode() returns
+     *               ``true``]
+     *
+     * @param      isOrphan    Indicates if _orphan_, ie. not attached to any
+     *                         canvas/cyclops device.
+     * @param      isPrimed    Indicates if completely configured (input channel,
+     *                         plugin, signals, led port)
+     * @param      genError    The error identifier in case of any error during
+     *                         code-generation.
+     * @param      flashError  The error identifier in case of any error during
+     *                         flashing the device.
+     */
     void isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& flashError);
     bool isSerialConnected();
 

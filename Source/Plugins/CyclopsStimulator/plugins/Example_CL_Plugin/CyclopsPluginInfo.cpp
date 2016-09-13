@@ -40,12 +40,13 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
 
     // The no. of input data channels that will be monitored for events.
     infoStruct.channelCount = 1;
-    // The no. of Sources needed on the Teensy, should be same as length of the vector below.
-    infoStruct.sourceCount = 4;
+    // The no. of Signals needed on the Teensy, should be same as length of the
+    // vector below.
+    infoStruct.signalCount = 4;
 
-    // These are the "Code Names" of the sources (same as the enums you made in <your-plugin>.cpp)
-    // These will appear on the GUI.
-    infoStruct.sourceCodeNames = { "FastSquare"
+    // These are the "Code Names" of the sources (same as the enums you made in
+    // <your-plugin>.cpp) These will appear on the GUI.
+    infoStruct.signalCodeNames = { "FastSquare"
                                  , "SlowSquare"
                                  , "Triangle"
                                  , "Sawtooth"};
@@ -55,6 +56,14 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
                                  , cyclops::sourceType::SQUARE
                                  , cyclops::sourceType::STORED
                                  , cyclops::sourceType::STORED};
+
+    // Choose which of the above signals must be used upon intitalisation/launch
+    // of the experiment.
+    infoStruct.initialSignal = 2;
+
+    // Choose the INITIAL Mode of Operation of ALL THE SIGNALS, when the experiment is
+    // initialised/launched.
+    infoStruct.allInitialMode   = cyclops::operationMode::N_SHOT;
 
     infoStruct.CyclopsPluginFactory = maker_function;
 

@@ -102,14 +102,17 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     pstep = 0.01;
     // communicate with teensy?
     refreshPlugins();
+
+    //BEWARE
+    program = new code::ProgramTeensy32();
 }
 
 void CyclopsCanvas::refreshPlugins()
 {
     if (pluginManager->getNumPlugins() == 0){
-        std::cout << "CPM> Making Cyclops-Plugin List" << std::endl;
+        std::cout << "*CL:sPM* Making Cyclops-Plugin List" << std::endl;
         pluginManager->loadAllPlugins();
-        std::cout << "CPM> Loaded " << pluginManager->getNumPlugins() << " cyclops plugin(s)." << std::endl;
+        std::cout << "*CL:sPM* Loaded " << pluginManager->getNumPlugins() << " cyclops plugin(s).\n" << std::endl;
     }
 }
 
@@ -120,7 +123,7 @@ CyclopsCanvas::~CyclopsCanvas()
 
 void CyclopsCanvas::beginAnimation()
 {
-    //std::cout << "CyclopsCanvas beginning animation." << std::endl;
+    //DBG ("CyclopsCanvas beginning animation.\n");
     disableAllInputWidgets();
     if (serialInfo.portName != ""){
         // serialInfo->Serial.writeByte(<launch>);
@@ -128,12 +131,12 @@ void CyclopsCanvas::beginAnimation()
         devStatus->setVisible(true);
         devStatus->repaint();
     }
-    startTimer(40);
+    //startTimer(40);
 }
 
 void CyclopsCanvas::endAnimation()
 {
-    std::cout << "CyclopsCanvas ending animation." << std::endl;
+    //DBG ("CyclopsCanvas ending animation.\n");
     enableAllInputWidgets();
     devStatus->setVisible(false);
     stopTimer();
@@ -150,7 +153,7 @@ void CyclopsCanvas::setParameter(int a, int b, int c, float d)
 
 void CyclopsCanvas::update()
 {
-    std::cout << "Updating CyclopsCanvas" << std::endl;
+    DBG ("Updating CyclopsCanvas\n");
 }
 
 
@@ -162,7 +165,7 @@ void CyclopsCanvas::refreshState()
 
 void CyclopsCanvas::resized()
 {
-    //std::cout << "resizing canvas" << std::endl;
+    //DBG ("resizing canvas\n");
     int width = getWidth(), height = getHeight();
     baudrateCombo->setBounds(width-75, 5, 70, 20);
     portCombo->setBounds(width-75-5-70, 5, 70, 20);
@@ -202,7 +205,7 @@ void CyclopsCanvas::getEditorIds(CyclopsCanvas* cc, Array<int>& editorIdList)
 int CyclopsCanvas::migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow /*=true*/)
 {
     int node_id = listener->getEditorId();
-    std::cout << "migrating " << node_id << " to Cyclops B" << dest->realIndex << std::endl;
+    std::cout << "*CL* Migrating " << node_id << " to Cyclops B" << dest->realIndex << "from Cyclops B" << src->realIndex << std::endl;
     // update combo selection
     for (int i=0; i<CyclopsCanvas::canvasList.size(); i++){
         if (CyclopsCanvas::canvasList[i]->realIndex == dest->realIndex)
@@ -248,7 +251,7 @@ void CyclopsCanvas::dropEditor(CyclopsCanvas* closingCanvas, int node_id)
 
 void CyclopsCanvas::refresh()
 {
-    //std::cout << "refreshing hvd" << std::endl;
+    //DBG ("refreshing hvd\n");
     hookViewDisplay->refresh();
     resized();
 }
@@ -423,6 +426,7 @@ void CyclopsCanvas::setDevice(string port)
         while (serialInfo.Serial->available() < RPC_IDENTITY_SZ);
         serialInfo.Serial->readBytes(identity, RPC_IDENTITY_SZ);
 
+        std::cout << "*CL* Contacting Cyclops device..." << std::endl;
         for (int i=0; i<RPC_IDENTITY_SZ-1-14; i++)
             std::cout << identity[i];
         std::cout << identity[52] << identity[55] << identity[58] << identity[61] << std::endl;
@@ -432,6 +436,9 @@ void CyclopsCanvas::setDevice(string port)
         if (identity[58] == '0')
         if (identity[61] == '0')
         */
+        // determine the kind of device: teensy, arduino, other
+        // JUST TEENSY FOR NOW
+        program = new code::ProgramTeensy32();
     }
     canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
 }
@@ -466,7 +473,7 @@ void CyclopsCanvas::addHook(int node_id)
     HookView* hv = CyclopsCanvas::hookViews.add(new HookView(node_id));
     hookViewDisplay->addAndMakeVisible(hv);
     decisionMap[node_id] = false;
-    //std::cout << "added hook" << std::endl;
+    //DBG ("added hook\n");
 }
 
 bool CyclopsCanvas::removeHook(int node_id)
@@ -482,24 +489,23 @@ bool CyclopsCanvas::removeHook(int node_id)
     return true;
 }
 
-void CyclopsCanvas::getAllSummaries(std::vector<std::bitset<CLSTIM_NUM_PARAMS> >& summaries)
+void CyclopsCanvas::getAllSummaries(std::vector<code::CyclopsHookConfig>& hookInfoList, Array<std::bitset<CLSTIM_NUM_PARAMS> >& summaries)
 {
+    summaries.clear();
+    hookInfoList.clear();
     for (auto& listener : canvasEventListeners.getListeners()){
         std::bitset<CLSTIM_NUM_PARAMS> summary;
-        getSummary(listener->getEditorId(), summary);
-        summaries.push_back(summary);
+        HookInfo* hi = getSummary(listener->getEditorId(), summary);
+
+        // Making the CyclopsHookConfig instance
+        code::CyclopsHookConfig chc(hi->nodeId, hi->LEDChannel, hi->pluginInfo, hi->selectedSignals);
+        hookInfoList.push_back(chc);
+        summaries.add(summary);
     }
 }
 
-void CyclopsCanvas::getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary)
-{
-    HookView* hv = CyclopsCanvas::getHookView(node_id);
-    jassert(hv != nullptr);
-    hv->makeSummary(summary);
-    summary.set(CLSTIM_MAP_CH, unicastGetChannelMapStatus(node_id));
-}
-
 // This is only called by CyclopsEditor::isReadyForLaunch()
+// there's another private function with same name!
 bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
 {
     std::bitset<CLSTIM_NUM_PARAMS> summary;
@@ -512,7 +518,7 @@ bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
     // check decisionMap
     std::map<int, bool>::iterator it;
     for (it = decisionMap.begin(); it != decisionMap.end(); it++)
-        std::cout << it->first << " : " << it->second << "\n";
+        DBG (it->first << " : " << it->second);
 
     for (it = decisionMap.begin(); it != decisionMap.end(); it++){
         if (it->second == false)
@@ -529,11 +535,12 @@ bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
 
 bool CyclopsCanvas::generateCode(int& genError)
 {
-    int numHooks = getNumListeners();
-    std::vector<std::bitset<CLSTIM_NUM_PARAMS> > summaries(numHooks);
-    getAllSummaries(summaries);
-    genError = 0;
-    return true;
+    Array<std::bitset<CLSTIM_NUM_PARAMS> > summaries;
+    std::vector<code::CyclopsHookConfig> hookInfoList;
+    getAllSummaries(hookInfoList, summaries);
+
+    code::CyclopsConfig config(hookInfoList, summaries);
+    return program->create(config, genError);
 }
 
 bool CyclopsCanvas::flashDevice(int& flashError)
@@ -660,6 +667,15 @@ void CyclopsCanvas::loadVisualizerParameters(XmlElement* xml)
     }
 }
 
+HookInfo* CyclopsCanvas::getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary)
+{
+    HookView* hv = CyclopsCanvas::getHookView(node_id);
+    jassert(hv != nullptr);
+    hv->makeSummary(summary);
+    summary.set(CLSTIM_MAP_CH, unicastGetChannelMapStatus(node_id));
+    return hv->hookInfo.get();
+}
+
 CyclopsCanvas::Listener* CyclopsCanvas::findListenerById(CyclopsCanvas* cc, int nodeId)
 {
     auto& listener_list = cc->canvasEventListeners.getListeners();
@@ -778,7 +794,7 @@ void LEDChannelPort::buttonClicked(Button* button)
     if (test_index >= 0){
         canvas->disableAllInputWidgets();
         canvas->broadcastEditorInteractivity(CanvasEvent::FREEZE);
-        std::cout << "Testing LED channel " << test_index << "\n";
+        std::cout << "*CL* Testing LED channel " << test_index << "\n";
         canvas->in_a_test = true;
         //serialInfo.Serial->testChannel(test_index);
         canvas->progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
@@ -1036,7 +1052,7 @@ HookViewDisplay::HookViewDisplay(CyclopsCanvas* _canvas) : canvas(_canvas)
 
 void HookViewDisplay::paint(Graphics& g)
 {
-    //std::cout << "painting hvd" << std::endl;
+    //DBG ("painting hvd\n");
     g.fillAll(Colours::darkgrey);
 }
 
@@ -1045,7 +1061,7 @@ void HookViewDisplay::refresh()
     height = 5;
     shownIds.clear();
     CyclopsCanvas::getEditorIds(canvas, shownIds);
-    //std::cout << "Now showing " << shownIds.size();
+    //DBG ("Now showing " << shownIds.size());
     for (int i=0; i<shownIds.size(); i++){
         HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
         jassert(hv != nullptr);
@@ -1054,14 +1070,14 @@ void HookViewDisplay::refresh()
         height += jmax(45, hv->getHeight()) + 5;
         hv->repaint();
     }
-    //std::cout << ". Height: " << height << std::endl;
+    //DBG (". Height: " << height\n");
     setSize(getWidth(), height);
     repaint();
 }
 
 void HookViewDisplay::resized()
 {
-    //std::cout << "resizing hvd to " << getHeight() << std::endl;
+    //DBG ("resizing hvd to " << getHeight() << "\n");
     for (int i=0; i<shownIds.size(); i++){
         HookView* hv = CyclopsCanvas::getHookView(shownIds[i]);
         jassert(hv != nullptr);
@@ -1206,7 +1222,7 @@ void HookView::comboBoxChanged(ComboBox* cb)
     HookViewDisplay* parent = getParentDisplay();
     parent->canvas->unicastPluginIndicator(CanvasEvent::PLUGIN_SELECTED, nodeId);
     parent->canvas->unicastUpdatePluginInfo(nodeId);
-    //std::cout << cb->getSelectedItemIndex() <<std::endl;
+    //DBG (cb->getSelectedItemIndex() << "\n");
     String name = cb->getItemText(cb->getSelectedItemIndex());
     hookInfo->pluginInfo = CyclopsCanvas::pluginManager->getInfo(name.toStdString());
 
@@ -1214,10 +1230,10 @@ void HookView::comboBoxChanged(ComboBox* cb)
     codeLabels.clear();
     signalLabels.clear();
     // resize the selectionMap, "zero" it in loop
-    hookInfo->selectedSignals.resize(hookInfo->pluginInfo->sourceCount);
+    hookInfo->selectedSignals.resize(hookInfo->pluginInfo->signalCount);
     // add sourceCodeLabels
-    std::vector<std::string>* codeNames = &hookInfo->pluginInfo->sourceCodeNames;
-    for (int i=0; i < hookInfo->pluginInfo->sourceCount; i++){
+    std::vector<std::string>* codeNames = &hookInfo->pluginInfo->signalCodeNames;
+    for (int i=0; i < hookInfo->pluginInfo->signalCount; i++){
         Label* l = codeLabels.add(new Label("codelabel", String(codeNames->at(i))));
         l->setFont(Font("Default", 16, Font::plain));
         l->setColour(Label::textColourId, Colours::black);
@@ -1248,9 +1264,9 @@ void HookView::paint(Graphics& g)
     if (hookInfo->pluginInfo != nullptr){
         // flushing away drawing
         g.setFillType(FillType(Colours::lightgrey));
-        g.fillRect(235, 0, 5+150+2+123, hookInfo->pluginInfo->sourceCount*20+10);
+        g.fillRect(235, 0, 5+150+2+123, hookInfo->pluginInfo->signalCount*20+10);
 
-        for (int i=0; i < hookInfo->pluginInfo->sourceCount; i++){
+        for (int i=0; i < hookInfo->pluginInfo->signalCount; i++){
             // drawing gradients
             switch (getCodeType(i)) {
                 case 0:
@@ -1352,11 +1368,11 @@ void HookView::makeSummary(std::bitset<CLSTIM_NUM_PARAMS>& summary)
     if (hookInfo->pluginInfo == nullptr)
         return;
     // LED output port is connected?
-    if (hookInfo->LEDChannel > 0){
+    if (hookInfo->LEDChannel > -1){
         summary.set(CLSTIM_MAP_LED);
     }
     // sanity check assertion, ignore.
-    jassert(hookInfo->pluginInfo->sourceCount == (int)hookInfo->selectedSignals.size());
+    jassert(hookInfo->pluginInfo->signalCount == (int)hookInfo->selectedSignals.size());
     // SignalMap completely configured?
     if (! (std::find(hookInfo->selectedSignals.begin(), hookInfo->selectedSignals.end(), -1) != hookInfo->selectedSignals.end()) ){
         summary.set(CLSTIM_MAP_SIG);
@@ -1436,7 +1452,7 @@ void HookView::enableAllInputWidgets()
 void HookView::prepareForDrag(int offset /* = 0 */)
 {
     signalRect.clear();
-    signalRect.addRoundedRectangle(235, 2, 285, hookInfo->pluginInfo->sourceCount*20+6, 4);
+    signalRect.addRoundedRectangle(235, 2, 285, hookInfo->pluginInfo->signalCount*20+6, 4);
     float dashOriginal[] = {6, 3, 2, 3};
     float dashOffset[] = {2, 3, 6, 3};
     if (offset)
@@ -1451,11 +1467,11 @@ int HookView::getIndexfromXY(const Point<int>& pos)
     int x = pos.getX(),
         y = pos.getY(),
         index = -1;
-    if (x > 240 && y > 5 && y < hookInfo->pluginInfo->sourceCount*20+5){
+    if (x > 240 && y > 5 && y < hookInfo->pluginInfo->signalCount*20+5){
         // in signalRect
         index = (y-5)/20;
         // sanity check!
-        jassert (index < hookInfo->pluginInfo->sourceCount);
+        jassert (index < hookInfo->pluginInfo->signalCount);
     }
     return index;
 }
@@ -1591,20 +1607,20 @@ SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
                                                 , isDragging(false)
 {
     File sigFile = getSignalsFile("cyclops_plugins/signals.yaml");
-    std::cout << "Fecthing signals.yaml from `" << sigFile.getFullPathName() << "`\n";
+    std::cout << "*CL* Fetching signals.yaml from `" << sigFile.getFullPathName() << "`\n";
     if (!sigFile.existsAsFile()){
-        std::cout << "Signals File not found! Expected @ Builds/Linux/build/cyclops_plugins/signals.yaml";
-        std::cout << "\nPerhaps you forgot to compile Cyclops (sub) Plugins?\n" << std::endl;
+        std::cout << "*CL* Signals File not found! Expected @ Builds/Linux/build/cyclops_plugins/signals.yaml\n";
+        std::cout << "*CL* Perhaps you forgot to compile Cyclops (sub) Plugins?\n" << std::endl;
         jassert(false);
     }
     else{
         std::ifstream inFile(sigFile.getFullPathName().toStdString());
         if (inFile){
             CyclopsSignal::readSignals(inFile);
-            std::cout << "Signals Collection created!\n\n";
+            std::cout << "*CL* Signals Collection created!\n\n";
         }
         else{
-            std::cout << "Error in opening `Builds/Linux/build/cyclops_plugins/signals.yaml`\nCheck if you have permissions to this file.\n" << std::endl;
+            std::cout << "*CL* Error in opening `Builds/Linux/build/cyclops_plugins/signals.yaml`\nCheck if you have permissions to this file.\n" << std::endl;
             jassert(false);
         }
         inFile.close();
@@ -1620,7 +1636,8 @@ SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
 void SignalDisplay::showDetails(int index)
 {
     CyclopsSignal* cs = CyclopsSignal::signals.getUnchecked(index);
-    std::cout << std::endl << cs->name << "::T" << cs->type << " Points: " << cs->size << std::endl;
+    std::cout << "*CL* <Signal Details>\n";
+    std::cout << cs->name << "::T" << cs->type << " Points: " << cs->size << std::endl;
     int length=0;
     for (int i=0; i<cs->size; i++) length += cs->holdTime[i];
     std::cout << "Length (ms): " << length << std::endl;
@@ -1629,7 +1646,7 @@ void SignalDisplay::showDetails(int index)
 void SignalDisplay::dragging(SignalButton* sb)
 {
     if (!isDragging){
-        //std::cout << "start" << std::endl;
+        //DBG ("start\n");
         isDragging = true;
         int index = sb->signalIndex;
         CyclopsSignal* cs = CyclopsSignal::signals.getUnchecked(index);
@@ -1646,7 +1663,7 @@ void SignalDisplay::dragging(SignalButton* sb)
 
 void SignalDisplay::dragDone(SignalButton* sb)
 {
-    //std::cout << "done" << std::endl;
+    //DBG ("done\n");
     isDragging = false;
 }
 

@@ -71,16 +71,15 @@ void CyclopsPluginManager::loadPlugins(const File &pluginPath) {
 
     for (int i = 0; i < foundDLLs.size(); i++)
     {
-        std::cout << "CPM>     Loading Plugin: " << foundDLLs[i].getFileNameWithoutExtension() << "... " << std::flush;
+        std::cout << "*CL:sPM*     Loading Plugin: " << foundDLLs[i].getFileNameWithoutExtension() << "... " << std::flush;
         if (loadPlugin(foundDLLs[i].getFullPathName()))
         {
             std::cout << "Loaded" << std::endl;
         }
         else
         {
-            std::cout << " DLL Load FAILED" << std::endl;
+            std::cout << " DLL Load FAILED!" << std::endl;
         }
-        std::cout << std::endl;
     }
 }
 
@@ -97,7 +96,7 @@ void CyclopsPluginManager::loadAllPlugins()
 
     for (auto &pluginPath : paths) {
         if (!pluginPath.isDirectory()) {
-            std::cout << "CPM>     (!) Plugin path not found: " << pluginPath.getFullPathName() << std::endl;
+            std::cout << "*CL:sPM*     (!) Plugin path not found: " << pluginPath.getFullPathName() << std::endl;
         } else {
             loadPlugins(pluginPath);
         }
@@ -190,7 +189,7 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
 
     if (piFunction == nullptr)
     {
-        ERROR_MSG("CPM>     (!) Failed to load function 'getCyclopsPluginInfo'");
+        ERROR_MSG("*CL:sPM*     (!) Failed to load function 'getCyclopsPluginInfo'");
         closeHandle(handle);
         return -1;
     }
@@ -200,16 +199,20 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
     // CyclopsPluginInfo& pInfo = new_map_elem->second;
     CyclopsPluginInfo pInfo;
     piFunction(pInfo);
-    if (pInfo.sourceCount != (int)pInfo.sourceCodeNames.size()){
-        std::cout << "CPM>     (!!) sourceCount doest not match no. of \"Source-Code-Names\".\nFAILED to load plugin" << pInfo.Name << std::endl;
+    if (pInfo.signalCount != (int)pInfo.signalCodeNames.size()){
+        std::cout << "*CL:sPM*     (!!) signalCount doest not match no. of \"Source-Code-Names\".\nFAILED to load plugin" << pInfo.Name << std::endl;
         return -1;
     }
-    else if (pInfo.sourceCount < 1){
-        std::cout << "CPM>     (!!) No Sources (aka Signals) have been defined for the plugin!\nFAILED to load plugin" << pInfo.Name << std::endl;
+    else if (pInfo.initialSignal < 0 || pInfo.initialSignal >= (int)pInfo.signalCodeNames.size()){
+        std::cout << "*CL:sPM*     (!!) initialSignal (" << pInfo.initialSignal << ") is out of bounds! Expected to be in [0, " << pInfo.signalCodeNames.size() << "].\nFAILED to load plugin" << std::endl;
         return -1;
     }
-    else if (pInfo.sourceCount != (int)pInfo.sourceCodeTypes.size()){
-        std::cout << "CPM>     (!!) sourceCount doest not match no. of \"Source-Code-Types\".\nFAILED to load plugin" << pInfo.Name << std::endl;
+    else if (pInfo.signalCount < 1){
+        std::cout << "*CL:sPM*     (!!) No Sources (aka Signals) have been defined for the plugin!\nFAILED to load plugin" << pInfo.Name << std::endl;
+        return -1;
+    }
+    else if (pInfo.signalCount != (int)pInfo.sourceCodeTypes.size()){
+        std::cout << "*CL:sPM*     (!!) signalCount doest not match no. of \"Source-Code-Types\".\nFAILED to load plugin" << pInfo.Name << std::endl;
         return -1;
     }
     // successful load, plugin seems valid.

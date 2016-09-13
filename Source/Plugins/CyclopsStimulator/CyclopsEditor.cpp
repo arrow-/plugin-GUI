@@ -83,7 +83,7 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
 
 CyclopsEditor::~CyclopsEditor()
 {
-    //std::cout<<"deleting cl_editor" << std::endl;
+    //DBG ("deleting cl_editor\n");
     connectedCanvas->removeListener(this);
     connectedCanvas->removeHook(nodeId);
     connectedCanvas->refresh();
@@ -242,7 +242,7 @@ void CyclopsEditor::comboBoxChanged(ComboBox* comboBox)
             newCanvas = CyclopsCanvas::canvasList.getUnchecked(selection-1);
         }
         else{
-            //std::cout << "create new canvas" <<std::endl;
+            //DBG ("create new canvas\n");
             newCanvas = CyclopsCanvas::canvasList.add(new CyclopsCanvas());
             CyclopsCanvas::broadcastNewCanvas();
         }
@@ -276,6 +276,16 @@ void CyclopsEditor::enableAllInputWidgets()
 }
 
 void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& flashError)
+/* Call Graph:
+ * ProcessorGraph::enableProcessors() [loops through all processors]
+ * CyclopsProcessor.isReady()
+ * this()
+ * CyclopsCanvas::getSummary(int, bool&)
+ * |
+ * +-- CyclopsCanvas::generateCode() [if getSummary() returns ``true``]
+ *     |
+ *     +-- CyclopsCanvas::flashDevice() [if generateCode() returns ``true``]
+*/
 {
     if (connectedCanvas == nullptr){
         isOrphan = true;
@@ -286,21 +296,22 @@ void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genErr
         isOrphan = false;
         if (connectedCanvas->getSummary(nodeId, isPrimed)){
             if (connectedCanvas->generateCode(genError)){
-                std::cout << "Generated" << "\n";
+                std::cout << "Generated\n";
                 if (connectedCanvas->flashDevice(flashError)){
-                    std::cout << "Flashed" << "\n";
+                    std::cout << "Flashed\n";
                 }
                 else{
-                    std::cout << "Flash FAIL" << "\n";
+                    std::cout << "Flash FAIL (code=" << flashError << ")\n";
                 }
             }
             else{
-                std::cout << "Generation FAIL" << "\n";
+                std::cout << "Generation FAIL (code=" << genError << ")\n";
                 flashError = 0;
             }
         }
         else{
             genError = flashError = 0;
+            DBG ("more editors waiting...\n");
         }
     }        
 }

@@ -58,9 +58,12 @@ all: notify $(SUBDIRS)
 
 notify:
 	@echo "Building Open-Ephys -- Cyclops Plugins"
-	@echo "Updating and preparing the Signal Database [from plugins/signals.yaml]"
 	-@mkdir -p $(OUTDIR)
+	@echo "Updating and preparing the Signal Database [from plugins/signals.yaml]"
 	-@cp $(PLUGIN_DIR)/signals.yaml $(OUTDIR)
+	@echo "Updating the Code Generation templates [from code_gen/*.json]"
+	-@mkdir $(OUTDIR)/code_gen_templates
+	-@cp $(PLUGIN_DIR)/../code_gen/*.json $(OUTDIR)/code_gen_templates
 
 $(SUBDIRS):
 	@if [ -f $@/Makefile ]; then $(MAKE) -C $@ ; fi

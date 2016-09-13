@@ -1,5 +1,5 @@
-#ifndef CL_CODEGEN_TEENSY32
-#define CL_CODEGEN_TEENSY32
+#ifndef CL_CODEGEN_TEENSY32_H
+#define CL_CODEGEN_TEENSY32_H
 
 #include "CyclopsCodeGen.h"
 #include <iomanip>
@@ -8,15 +8,15 @@
 namespace cyclops {
 namespace code {
 
-class ProgramTeensy32 : protected CyclopsProgram
+class ProgramTeensy32 : public CyclopsProgram
 {
 public:
 	ProgramTeensy32();
 private:
-	bool createFromConfig();
-	String getSourceHeader();
-	String getMain();
-	String getMakefile();
+	int createFromConfig();
+	bool updateSourceHeader();
+	bool updateMain();
+	bool updateMakefile();
 
 	static bool fetchTemplates;
 	static StringArray setupTemplates,

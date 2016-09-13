@@ -81,7 +81,13 @@ bool CyclopsProcessor::isReady()
 
         isParticipating = true;
     }
-    std::cout << nodeId << "| orph-prime-genE-flE-Part : " << isOrphan << isPrimed << genError << flashError << isParticipating << "\n";
+    if (!isOrphan && isPrimed){
+        pluginInfo = cl_editor->refreshPluginInfo();
+        plugin = pluginInfo->CyclopsPluginFactory();
+
+        isParticipating = true;
+    }
+    DBG (nodeId << " > orphan primed conclude (gen, flash) : " << isOrphan << isPrimed  << isParticipating << " E(" << genError << ", " << flashError << ") " << "\n");
     return ((genError == 0) && (flashError == 0));
 }
 
@@ -98,10 +104,12 @@ void CyclopsProcessor::updateSettings()
 bool CyclopsProcessor::enable()
 {
     if (isParticipating){
-        std::cout << "Name     : " << pluginInfo->Name << "\n";
-        std::cout << "sources  : " << pluginInfo->sourceCount << "\n";
-        std::cout << "channels : " << pluginInfo->channelCount << "\n";
-        // DANGEROUS!
+        DBG ("~~~~~~~~~ Cyclops Sub Plugin enabled! ~~~~~~~~~");
+        DBG ("Name (Hook-ID)    : " << pluginInfo->Name << " (" << nodeId << ")");
+        DBG ("sources (signals) : " << pluginInfo->signalCount);
+        DBG ("input-channels    : " << pluginInfo->channelCount);
+        // DANGEROUS! because the experiment will be launched only after all
+        // processors are enabled, timer should not start ASAP!?
         startTimer(pluginInfo->timePeriod);
         return true;
     }

@@ -111,7 +111,8 @@ struct CyclopsRPC
     int length;
 };
 
-class CyclopsSignal{
+class CyclopsSignal
+{
 public:
     int type;
     int size;

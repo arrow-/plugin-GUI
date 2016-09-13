@@ -54,14 +54,12 @@ private:
 
 public:
     /**
-     * Suppose you want to control N ( < 4) channels. In the plugin code, you
-     * can refer to these channels by integer indices. But, for an experiment,
-     * you might want plugin-channel-0 to _physically_ mean ``CH2`` on the
-     * Cyclops Board.
-     *
      * This array defines a mapping from _plugin-code-channel_ to
-     * _physical-cyclops-channel_, and is filled automatically by the GUI
-     * according to your inputs on the editor window.
+     * _OE-data-channel_, and is filled automatically by the GUI according to
+     * your inputs on the editor window.
+     *
+     * This lets you select which data channels from the GUI data flow are
+     * directed into your plugin
      */
     Array<int> Channels;
 

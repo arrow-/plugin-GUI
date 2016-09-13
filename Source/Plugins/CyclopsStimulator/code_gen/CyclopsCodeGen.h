@@ -1,24 +1,54 @@
 #ifndef CL_CODE_GENERATE_H
 #define CL_CODE_GENERATE_H
 
-#include "../CyclopsAPI/CyclopsAPI.h"
-#include "../CyclopsCanvas.h"
+#include "../../../../JuceLibraryCode/JuceHeader.h"
 #include <vector>
 #include <map>
 #include <bitset>
+#include "../Headers/CoreServicesHeader.h"
+#include "../CyclopsAPI/CyclopsAPI.h"
+#include "../plugin_manager/CyclopsPluginInfo.h"
+
+#define CLSTIM_NUM_PARAMS  3
+#define CLSTIM_MAP_CH      0
+#define CLSTIM_MAP_SIG     1
+#define CLSTIM_MAP_LED     2
 
 namespace cyclops{
 
 class CyclopsSignal;
-class HookInfo;
 
 namespace code{
 
-typedef std::pair<String, String> PluginCodename_Pair_t;
 typedef std::pair<int, String> IdCodename_Pair_t;
 
 typedef std::map<IdCodename_Pair_t, String> IdCodename_SourceMap_t;
-typedef std::map<PluginCodename_Pair_t, String> PluginCodename_SourceMap_t;
+
+/**
+ * @brief      A clone (of sorts) of cyclops::HookInfo to hold hook
+ *             configuration, relevant for code-generation.
+ * @details    Instances must be created, and all instances must be collected
+ *             into an ``std::vector<CyclopsHookConfig*>`` by the CyclopsCanvas and
+ *             passed to the code-generator. **This decouples the code-generation
+ *             from CyclopsCanvas and it's objects.**
+ */
+class CyclopsHookConfig
+{
+public:
+	int nodeId, LEDChannel;
+	CyclopsPluginInfo* pluginInfo;
+	std::vector<int> selectedSignals;
+
+	CyclopsHookConfig( int node_id, int LEDchannel, CyclopsPluginInfo* pInfo
+					 , std::vector<int>& selection);
+	/*
+	CyclopsHookConfig();
+	CyclopsHookConfig& operator= (const CyclopsHookConfig& rhs);
+	*/
+};
+
+// Might require the operator== later, if complicated structure is added to CyclopsHookConfig... */
+bool operator== (const CyclopsHookConfig& lhs, const CyclopsHookConfig& rhs);
 
 /**
  * @brief      This collects all user configurations and inputs for the Code
@@ -29,54 +59,61 @@ typedef std::map<PluginCodename_Pair_t, String> PluginCodename_SourceMap_t;
 class CyclopsConfig
 {
 public:
-	CyclopsConfig( std::vector<HookInfo*>& hInfos
-				 , std::vector<std::bitset<CLSTIM_NUM_PARAMS> >& summaryList);
+	CyclopsConfig();
+	CyclopsConfig( std::vector<CyclopsHookConfig>& hInfos
+				 , Array<std::bitset<CLSTIM_NUM_PARAMS> >& summaryList);
 	CyclopsConfig& operator= (const CyclopsConfig& rhs);
-	std::vector<HookInfo*> hookInfos;
-	std::vector<std::bitset<CLSTIM_NUM_PARAMS> > summaries;
+	std::vector<CyclopsHookConfig> hookInfos;
+	Array<std::bitset<CLSTIM_NUM_PARAMS> > summaries;
 
 	//int timeOfBuild;
 };
 
 bool operator== (const CyclopsConfig& lhs, const CyclopsConfig& rhs);
 
+
+
+
+
+
+
+
+
 class CyclopsProgram
 {
 public:
 	CyclopsProgram(const String& deviceName);
-	bool create(CyclopsConfig* config);
+	virtual ~CyclopsProgram();
+	bool create(const CyclopsConfig& config, int& genError);
 
 	const String device;
+
+	int64 currentHash;
+	String sourceHeader,
+		   main,
+		   makefile;
 
 protected:
 	inline File getFileFromExeDir(const String& pathFromExeDir);
 	bool getTemplateJSON(String& templateJSON);
 
-	virtual bool createFromConfig() = 0;
-	virtual String getSourceHeader() = 0;
-	virtual String getMain() = 0;
-	virtual String getMakefile() = 0;
-	virtual String getDeviceName() = 0;
+	virtual int createFromConfig() = 0;
+	virtual bool updateSourceHeader() = 0;
+	virtual bool updateMain() = 0;
+	virtual bool updateMakefile() = 0;
+
+	const String& getSourceName(int node_id, int index);
 	/*
 	virtual addPlugin(CyclopsPluginInfo*) = 0;
 	virtual removePlugin(CyclopsPluginInfo*) = 0;
 	*/
-	PluginCodename_SourceMap_t sourceDataArrays;
-	IdCodename_SourceMap_t     sourceObjects;
-	StringArray globalSrcList;
-	
-	CyclopsConfig *oldConfig;
-};
+	std::map<String, String> sourceDataArrays;
+	IdCodename_SourceMap_t   sourceObjects;
+	std::map<int, int> sourceListMap;
+	StringArray sourceList;
 
-class CyclopsCodeGenerator
-{
-public:
-	CyclopsCodeGenerator(CyclopsProgram *target_program);
-	virtual bool generate(int& genError, CyclopsConfig& config);
-
-protected:
-	String oldCode;
-	CyclopsProgram *program;
+	bool oldConfigAvailable;	
+	CyclopsConfig oldConfig;
 };
 
 } // NAMESPACE cyclops::code

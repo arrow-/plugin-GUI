@@ -15,11 +15,15 @@ namespace cyclops{
 struct CyclopsPluginInfo
 {
     std::string Name;
-    int sourceCount;
+    int signalCount;
     int channelCount;
     int timePeriod;
-    std::vector<std::string> sourceCodeNames;
+
+    std::vector<std::string> signalCodeNames;
     std::vector<sourceType>  sourceCodeTypes;
+    int initialSignal;
+    operationMode allInitialMode;
+
     CyclopsPlugin* (*CyclopsPluginFactory)();
 };
 
