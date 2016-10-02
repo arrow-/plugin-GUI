@@ -9,7 +9,8 @@ StringArray ProgramTeensy32::loopTemplates;
 StringArray ProgramTeensy32::sourceHeaderTemplates;
 StringArray ProgramTeensy32::makefileTemplates;
 
-ProgramTeensy32::ProgramTeensy32() : CyclopsProgram("teensy32"){
+ProgramTeensy32::ProgramTeensy32() : CyclopsProgram("teensy32")
+{
 	if (fetchTemplates){
 		// read template file, and fetch content as string
 		String templateJSON;
@@ -31,11 +32,11 @@ ProgramTeensy32::ProgramTeensy32() : CyclopsProgram("teensy32"){
 					makefileTemplates.add(svar.toString());
 				}
 				fetchTemplates = false;
-				DBG ("[success] Parse Teemsy32 JSON template\n");
+				DBG ("[success] Parse Teensy32 JSON template");
 				CoreServices::sendStatusMessage("Loaded Teensy32 templates file.");
 			}
 			else{
-				DBG ("[failed] Parse Teemsy32 JSON template :(\n");
+				DBG ("[failed] Parse Teemsy32 JSON template :(");
 				DBG (result.getErrorMessage());
 				jassert(false);
 			}
@@ -48,16 +49,17 @@ ProgramTeensy32::ProgramTeensy32() : CyclopsProgram("teensy32"){
 
 int ProgramTeensy32::createFromConfig()
 {
-	std::cout << "Creating from config" << std::endl;
+	std::cout << "Creating from config ... " << std::flush;
 	if (updateSourceHeader()){
-		std::cout << "src-header done" << std::endl;
+		//std::cout << "src-header done" << std::endl;
 		if (updateMain()){
-			std::cout << "main done" << std::endl;
-			if (updateMakefile())
+			//std::cout << "main done" << std::endl;
+			if (updateMakefile()){
+				//std::cout << "makefile done" << std::endl;
 				return 0;
+			}
 			else
 				return 3;
-			std::cout << "make maybe done" << std::endl;
 		}
 		else
 			return 2;
@@ -68,10 +70,10 @@ int ProgramTeensy32::createFromConfig()
 
 bool ProgramTeensy32::updateSourceHeader()
 {
-	DBG (".... making header");
+	//DBG (".... making header");
 	std::ostringstream result(sourceHeaderTemplates[0].toStdString(), std::ios_base::ate);
 	for (int i=0; i < (int)oldConfig.summaries.size(); ++i){
-		DBG (".... hook " << i);
+		//DBG (".... hook " << i);
 		if (oldConfig.summaries[i].all()){
 			const CyclopsHookConfig& hInfo = oldConfig.hookInfos[i];
 			const CyclopsPluginInfo* pInfo = hInfo.pluginInfo;
@@ -127,7 +129,7 @@ bool ProgramTeensy32::updateSourceHeader()
 	for (IdCodename_SourceMap_t::iterator it = sourceObjects.begin(); it != sourceObjects.end(); ++it){
 		result << it->second << std::endl;
 	}
-	DBG (".... Need to make the global source list");
+	//DBG (".... Need to make the global source list");
 	
 	result << sourceHeaderTemplates[1];
 	result << "cyclops::Source* SourceList[] = {";
@@ -155,7 +157,7 @@ bool ProgramTeensy32::updateSourceHeader()
 	}
 	result << "};" << std::endl;
 	
-	std::cout << ".... Register the global list" << std::endl;
+	//DBG (".... Register the global list");
 	result << sourceHeaderTemplates[2] << "REGISTER_SOURCE_LIST(SourceList, " << sourceObjects.size() << ");" << std::endl;
 	result << sourceHeaderTemplates[3];
 
@@ -178,7 +180,7 @@ bool ProgramTeensy32::updateMain()
 
 			int channel = hInfo.LEDChannel;
 
-			result << "cyclops::Board ch" << channel << " (cyclops::Board::CH" << channel << ");" << std::endl;
+			result << "cyclops::Board ch" << channel << " (cyclops::board::CH" << channel << ");" << std::endl;
 			result << "cyclops::Waveform w_" << hInfo.nodeId << "_" << channel << " (&ch" << channel << ", &" << getSourceName(hInfo.nodeId, pInfo->initialSignal) << ");" << std::endl << std::endl;
 		}
 	}
@@ -190,7 +192,11 @@ bool ProgramTeensy32::updateMain()
 
 bool ProgramTeensy32::updateMakefile()
 {
-	makefile = "";
+	std::ostringstream result(makefileTemplates[0].toStdString(), std::ios_base::ate);
+	result << "control\n";
+	result << makefileTemplates[1] << arduinoPath << "\n";
+	result << makefileTemplates[2];
+	makefile = result.str();
 	return true;
 }
 

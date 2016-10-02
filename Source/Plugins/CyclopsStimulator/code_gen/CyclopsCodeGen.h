@@ -85,17 +85,23 @@ public:
 	CyclopsProgram(const String& deviceName);
 	virtual ~CyclopsProgram();
 	bool create(const CyclopsConfig& config, int& genError);
+	bool build(int &buildError);
 
 	const String device;
+	String arduinoPath;
 
-	int64 currentHash;
+	int32 currentHash;
 	String sourceHeader,
 		   main,
 		   makefile;
+	bool oldConfigAvailable;
 
 protected:
 	inline File getFileFromExeDir(const String& pathFromExeDir);
+
+	bool readJSON(String fileName, String& json_str);
 	bool getTemplateJSON(String& templateJSON);
+	bool getConfig(String& configJSON);
 
 	virtual int createFromConfig() = 0;
 	virtual bool updateSourceHeader() = 0;
@@ -112,8 +118,9 @@ protected:
 	std::map<int, int> sourceListMap;
 	StringArray sourceList;
 
-	bool oldConfigAvailable;	
 	CyclopsConfig oldConfig;
+
+	static String code_gen_config;
 };
 
 } // NAMESPACE cyclops::code

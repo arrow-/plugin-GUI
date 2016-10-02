@@ -517,9 +517,10 @@ bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
 
     // check decisionMap
     std::map<int, bool>::iterator it;
+    /*
     for (it = decisionMap.begin(); it != decisionMap.end(); it++)
         DBG (it->first << " : " << it->second);
-
+    */
     for (it = decisionMap.begin(); it != decisionMap.end(); it++){
         if (it->second == false)
             break;
@@ -541,6 +542,16 @@ bool CyclopsCanvas::generateCode(int& genError)
 
     code::CyclopsConfig config(hookInfoList, summaries);
     return program->create(config, genError);
+}
+
+bool CyclopsCanvas::buildCode(int& buildError)
+{
+    if (program->currentHash != 0)
+        return program->build(buildError);
+    else{
+        buildError = 1;
+        return false;
+    }
 }
 
 bool CyclopsCanvas::flashDevice(int& flashError)

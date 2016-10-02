@@ -71,9 +71,9 @@ void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int sample
 bool CyclopsProcessor::isReady()
 {
     CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
-    int genError, flashError;
+    int genError, buildError, flashError;
 
-    cl_editor->isReadyForLaunch(isOrphan, isPrimed, genError, flashError);
+    cl_editor->isReadyForLaunch(isOrphan, isPrimed, genError, buildError, flashError);
     if (!isOrphan && isPrimed && cl_editor->isSerialConnected()){
         pluginInfo = cl_editor->refreshPluginInfo();
         serialInfo = cl_editor->getSerial();

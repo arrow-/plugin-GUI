@@ -94,10 +94,12 @@ public:
      *                         plugin, signals, led port)
      * @param      genError    The error identifier in case of any error during
      *                         code-generation.
+     * @param      buildError  The error identifier in case of any error during
+     *                         compilation of the generated code.
      * @param      flashError  The error identifier in case of any error during
      *                         flashing the device.
      */
-    void isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& flashError);
+    void isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& buildError, int& flashError);
     bool isSerialConnected();
 
     /** Called to inform the editor that acquisition is about to start*/

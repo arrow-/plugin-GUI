@@ -275,7 +275,7 @@ void CyclopsEditor::enableAllInputWidgets()
     canvasCombo->setEnabled(true);
 }
 
-void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int& flashError)
+void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genError, int & buildError, int& flashError)
 /* Call Graph:
  * ProcessorGraph::enableProcessors() [loops through all processors]
  * CyclopsProcessor.isReady()
@@ -297,21 +297,28 @@ void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genErr
         if (connectedCanvas->getSummary(nodeId, isPrimed)){
             if (connectedCanvas->generateCode(genError)){
                 std::cout << "Generated\n";
-                if (connectedCanvas->flashDevice(flashError)){
-                    std::cout << "Flashed\n";
+                if (connectedCanvas->buildCode(buildError)){
+                    std::cout << "Compiled\n";
+                    if (connectedCanvas->flashDevice(flashError)){
+                        std::cout << "Flashed\n";
+                    }
+                    else{
+                        std::cout << "\n\t*CL:Code* Flash FAIL (code=" << flashError << ")\n";
+                    }
                 }
                 else{
-                    std::cout << "Flash FAIL (code=" << flashError << ")\n";
+                    std::cout << "\n\t*CL:Code* Compilation FAIL (code=" << buildError <<")\n";
+                    flashError = 0;
                 }
             }
             else{
-                std::cout << "Generation FAIL (code=" << genError << ")\n";
+                std::cout << "\n\t*CL:Code* Generation FAIL (code=" << genError << ")\n";
+                buildError = 0;
                 flashError = 0;
             }
         }
         else{
-            genError = flashError = 0;
-            DBG ("more editors waiting...\n");
+            genError = buildError = flashError = 0;
         }
     }        
 }

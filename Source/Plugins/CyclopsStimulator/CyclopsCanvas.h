@@ -188,9 +188,22 @@ public:
      *                       otherwise.
      *
      * @return     ``true`` if we must move to the next step in
-     *             "experiment-launch", ``false`` otherwise.
+     *             "experiment-launch" (building), ``false`` otherwise.
      */
     bool generateCode(int& genError);
+
+    /**
+     * @brief      Attempts to invoke ``make`` to compile the generated code in
+     *             a child process.
+     *
+     * @param      buildError  The error-code representing error during
+     *                         compilation. ``0`` if no error  occured,
+     *                         ``Positive`` otherwise.
+     *
+     * @return     ``true`` if we must move to the next step in
+     *             "experiment-launch"" (flashing), ``false`` otherwise.
+     */
+    bool buildCode(int& buildError);
 
     /**
      * @brief      Reads the status of ``CyclopsCanvas::program``, and attempts
@@ -200,7 +213,7 @@ public:
      *                         Positive if flashing failed.
      *
      * @return     ``true`` if we must move to the next step in the
-     *             "experiment-launch", ``false`` otherwise.
+     *             "experiment-launch" (launching), ``false`` otherwise.
      */
     bool flashDevice(int& flashError);
 
