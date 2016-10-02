@@ -856,11 +856,9 @@ int LEDChannelPort::getIndexfromXY(const Point<int>& pos)
         x = pos.getX(),
         y = pos.getY(),
         index = -1;
-    if (x > 20 && y > 5 && y < 4*height/5){
+    if (x > 20 && y > 5){
         // in Rect
-        index = (y/(float)height)*5;
-        // sanity check!
-        jassert (index < 4);
+        index = jmin(3.0f, y*5/(float)height);
     }
     return index;
 }
@@ -910,7 +908,8 @@ void LEDChannelPort::itemDragExit(const SourceDetails& dragSouceDetails)
 
 void LEDChannelPort::itemDropped(const SourceDetails& dragSouceDetails)
 {
-    addConnection(dragSouceDetails.sourceComponent);
+    if(mouseOverIndex >= 0)
+        addConnection(dragSouceDetails.sourceComponent);
     isDragging = false;
     dragDescription = nullptr;
     dragShouldDraw = true;

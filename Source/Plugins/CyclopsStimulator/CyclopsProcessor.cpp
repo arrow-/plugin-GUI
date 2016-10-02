@@ -87,7 +87,7 @@ bool CyclopsProcessor::isReady()
 
         isParticipating = true;
     }
-    DBG (nodeId << " > orphan primed conclude (gen, flash) : " << isOrphan << isPrimed  << isParticipating << " E(" << genError << ", " << flashError << ") " << "\n");
+    // DBG (nodeId << " > orphan primed conclude (gen, flash) : " << isOrphan << isPrimed  << isParticipating << " E(" << genError << ", " << flashError << ") " << "\n");
     return ((genError == 0) && (flashError == 0));
 }
 
