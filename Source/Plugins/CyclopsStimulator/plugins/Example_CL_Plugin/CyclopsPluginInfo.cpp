@@ -63,7 +63,7 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
 
     // Choose the INITIAL Mode of Operation of ALL THE SIGNALS, when the experiment is
     // initialised/launched.
-    infoStruct.allInitialMode   = cyclops::operationMode::N_SHOT;
+    infoStruct.allInitialMode   = cyclops::operationMode::LOOPBACK;
 
     infoStruct.CyclopsPluginFactory = maker_function;
 

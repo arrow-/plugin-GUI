@@ -556,8 +556,12 @@ bool CyclopsCanvas::buildCode(int& buildError)
 
 bool CyclopsCanvas::flashDevice(int& flashError)
 {
-    flashError = 0;
-    return true;
+    if (program->currentHash != 0)
+        return program->flash(flashError, realIndex);
+    else{
+        flashError = 1;
+        return false;
+    }
 }
 
 

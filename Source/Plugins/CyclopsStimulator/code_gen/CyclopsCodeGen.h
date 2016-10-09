@@ -86,15 +86,18 @@ public:
 	virtual ~CyclopsProgram();
 	bool create(const CyclopsConfig& config, int& genError);
 	bool build(int &buildError);
+	bool flash(int &flashError, int canvas_index);
 
 	const String device;
-	String arduinoPath;
-
 	int32 currentHash;
 	String sourceHeader,
 		   main,
 		   makefile;
 	bool oldConfigAvailable;
+
+	static String arduinoPath,
+		   		  deviceDir,
+		   		  arduinoLibPath;
 
 protected:
 	inline File getFileFromExeDir(const String& pathFromExeDir);
@@ -120,7 +123,7 @@ protected:
 
 	CyclopsConfig oldConfig;
 
-	static String code_gen_config;
+	static bool readBuildConfig;
 };
 
 } // NAMESPACE cyclops::code

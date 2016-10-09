@@ -68,7 +68,10 @@ bool operator==(const CyclopsConfig& lhs, const CyclopsConfig& rhs)
 
 
 
-String CyclopsProgram::code_gen_config = "";
+bool CyclopsProgram::readBuildConfig = true;
+String CyclopsProgram::arduinoPath = "";
+String CyclopsProgram::deviceDir = "";
+String CyclopsProgram::arduinoLibPath = "";
 
 CyclopsProgram::CyclopsProgram( const String& deviceName) : device(deviceName)
                                                           , currentHash(0)
@@ -77,10 +80,14 @@ CyclopsProgram::CyclopsProgram( const String& deviceName) : device(deviceName)
                                                           , makefile("")
                                                           , oldConfigAvailable(false)
 {
-    if (code_gen_config == "")
-        jassert (getConfig(code_gen_config) == true);
-    var conf = JSON::parse(code_gen_config);
-    arduinoPath = conf["arduino_path"].toString();
+    if (readBuildConfig == true){
+        String config_text;
+        jassert (getConfig(config_text) == true);
+        var code_gen_config = JSON::parse(config_text);
+        arduinoPath    = code_gen_config["arduinoPath"].toString();
+        deviceDir      = code_gen_config["deviceDir"].toString();
+        arduinoLibPath = code_gen_config["arduinoLibPath"].toString();
+    }
 }
 
 CyclopsProgram::~CyclopsProgram()
@@ -94,7 +101,6 @@ bool CyclopsProgram::create(const CyclopsConfig& config, int& genError)
     sourceObjects.clear();
     sourceListMap.clear();
     sourceList.clear();
-    DBG ("Starting program creation");
 
 /*    if (oldConfigAvailable){
         DBG ("old config is here :(");
@@ -115,12 +121,10 @@ bool CyclopsProgram::create(const CyclopsConfig& config, int& genError)
 
     genError = createFromConfig();
 	if (genError == 0){
-        var conf = JSON::parse(code_gen_config);
-        String devdir_path = conf["devdir"].toString();
-        File devdir(devdir_path);
+        File devdir(deviceDir);
         if (!devdir.exists())
             devdir.createDirectory();
-        String srcdir_path = conf["devdir"].toString()+"/src";
+        String srcdir_path = deviceDir+"/src";
         File srcdir(srcdir_path);
         if (!srcdir.exists())
             srcdir.createDirectory();
@@ -135,7 +139,7 @@ bool CyclopsProgram::create(const CyclopsConfig& config, int& genError)
         fout << "#define __CL_CG_" << device.toUpperCase() << "__\n";
         fout << "#define __CL_CG_PROG_HASH__ " << currentHash << "L\n\n" << main << "\n";
         fout.close();
-        fout.open(devdir_path.toStdString()+"/Makefile");
+        fout.open(deviceDir.toStdString()+"/Makefile");
         fout << makefile << "\n";
         fout.close();
         return true;
@@ -153,13 +157,13 @@ bool CyclopsProgram::create(const CyclopsConfig& config, int& genError)
 
 bool CyclopsProgram::build(int& buildError)
 {
-    var conf = JSON::parse(code_gen_config);
-    String buildCommandBase = "make -f " + conf["devdir"].toString() + "/Makefile CURDIR=" + conf["devdir"].toString() + " VERBOSITY=0";
+    String buildCommandBase = "make -C " + deviceDir + " VERBOSITY=0 hex";
     ChildProcess maker;
     std::cout << "Compiling ... " << std::flush;
     maker.start(buildCommandBase, ChildProcess::StreamFlags::wantStdOut|ChildProcess::StreamFlags::wantStdErr);
     /*
-    char temp[200]; // hopefully this is large enough for any warnings or errors
+    // PROGRESS INDICATION
+    char temp[200];
     String buffer;
     int tpos = -1, read = 0, status = 0;
     while (maker.isRunning()){
@@ -183,9 +187,46 @@ bool CyclopsProgram::build(int& buildError)
     }
     std::cout << buffer << std::endl;
     */
-    maker.waitForProcessToFinish(20000);
-    buildError = maker.getExitCode();
+    while (maker.isRunning()){
+        // Why are we polling the return code?
+        // We could have simply written this:
+        //     ```
+        //     maker.waitForProcessToFinish(25000);
+        //     buildError = maker.getExitCode();
+        //     ```
+        // Unfortuneately, that would not give us the exit code, since the child
+        // process has terminated by the time we are fetching it's exit code.
+        buildError = maker.getExitCode();
+    }
+    String build_output = maker.readAllProcessOutput();
+    //DBG ("\n*CL:CODE* ~~~~~~~~~ BUILD OUTPUT ~~~~~~~~~\n" << build_output << "\n -------------------------------------------");
+    //std::cout << build_output << std::endl;
+    std::cout << " Status (" << buildError << ") ";
     return (buildError == 0);
+}
+
+bool CyclopsProgram::flash(int &flashError, int canvas_index)
+{
+    String buildCommandBase = "make -C " + deviceDir + " VERBOSITY=0 upload";
+    //String buildCommandBase = "echo \"FOOBAR\"";
+    ChildProcess flasher;
+    std::cout << "Flashing ... " << std::flush;
+    flasher.start(buildCommandBase, ChildProcess::StreamFlags::wantStdOut|ChildProcess::StreamFlags::wantStdErr);
+    while (flasher.isRunning()){
+        // Why are we polling the return code?
+        // We could have simply written this:
+        //     ```
+        //     flasher.waitForProcessToFinish(25000);
+        //     buildError = flasher.getExitCode();
+        //     ```
+        // Unfortuneately, that would not give us the exit code, since the child
+        // process has terminated by the time we are fetching it's exit code.
+        flashError = flasher.getExitCode();
+    }
+    flasher.readAllProcessOutput();
+    std::cout << " Status (" << flashError << ") ";
+    flashError = flasher.getExitCode();
+    return (flashError == 0);
 }
 
 // SUPPORT APPLE LATER
