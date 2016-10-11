@@ -53,17 +53,57 @@ inline static uint8_t getMultiByteHeader (int _channel)
     return (_channel << 5);
 }
 
-/*
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-  |                                 SINGLE BYTE COMMANDS                          |
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-*/
 
 
+CyclopsDeviceInfo::CyclopsDeviceInfo(const unsigned char* id_str): numWaveforms(0),
+                                                                   numChannels(0)
+{   
+    /*
+    AUNO  @CL36\r\n
+    W 2\r\n
+    B 0101\r\n
 
+    T32   @CL36\r\n
+    W 1\r\n
+    B 0001\r\n
+    */
+    parseUnsignedChar(id_str);
+    if (identity[0] == 'A'){
+        isArduino = true;
+    }
+    else{
+        isArduino = false;
+    }
+    isTeensy = !isArduino;
+    devName = identity.substring(1, 6);
+    for (int i=0; i<4; i++){
+        int isSet = identity[RPC_IDENTITY_SZ-6+i] - '0';
+        if (isSet) numChannels++;
+        channelState[i] = isSet;
+    }
+    numWaveforms = identity[15] - '0';
+    libMajor = identity[9] - '0';
+    libMinor = identity[10] - '0';
+}
 
+String CyclopsDeviceInfo::toString()
+{
+    String res = "";
+    if (isArduino) res += "Arduino ";
+    else if (isTeensy) res += "Teensy";
+    res += devName + " W(" + String(numWaveforms) + ") B(";
+    res += identity.substring(RPC_IDENTITY_SZ-6, RPC_IDENTITY_SZ-2);
+    return res;
+}
 
-
+void CyclopsDeviceInfo::parseUnsignedChar(const unsigned char* id_str)
+{
+    char temp[RPC_IDENTITY_SZ];
+    for (int i=0; i<RPC_IDENTITY_SZ; i++){
+        temp[i] = (char)id_str[i];
+    }
+    identity = String(CharPointer_ASCII(temp));
+}
 
 
 OwnedArray<CyclopsSignal> CyclopsSignal::signals;
@@ -93,6 +133,12 @@ const CyclopsSignal& CyclopsSignal::getSignalByIndex(int index)
 
 
 
+
+/*
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  |                                 SINGLE BYTE COMMANDS                          |
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+*/
 
 bool start (CyclopsRPC *rpc, const int *channels, int channelCount)
 {

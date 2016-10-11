@@ -357,7 +357,10 @@ void CyclopsEditor::updateIndicators(CanvasEvent event)
     }
     else if (event == CanvasEvent::SERIAL_LED){
         if (isSerialConnected())
-            serialLED->update(CyclopsColours::connected, "Connected");
+            if (connectedCanvas->serialIsVerified)
+                serialLED->update(CyclopsColours::connected, "Connected");
+            else
+                serialLED->update(CyclopsColours::notVerified, "Connected, but not verified");
         else
             serialLED->update(CyclopsColours::disconnected, "Not Connected");
     }

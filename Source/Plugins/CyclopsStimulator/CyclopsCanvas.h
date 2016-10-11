@@ -41,6 +41,7 @@ namespace cyclops {
     namespace CyclopsColours{
     const Colour disconnected(0xffff3823);
     const Colour notResponding(0xffffa834);
+    const Colour notVerified(0xff3d64ff);
     const Colour connected(0xffc1d045);
     const Colour notReady       = disconnected;
     const Colour Ready          = connected;
@@ -260,21 +261,26 @@ public:
     /** This is the "real" name of the Canvas, which appears on the tab,
      * dropwdowns, etc. */
     int realIndex;
-     /** The dataWindow is _owned_ by this canvas, unlike DataWindows of other
-      * plugins. This is the only way editors can "share" it. Editors
-      * create/destroy DataWindow when the SelectorButton is pressed or the
-      * editor is deleted. When the DataWindow is owned by an editor, how would
-      * it pass ownership when it is deleted, so that window is not destroyed
-      * with it, to a sibling editor (if any)? <br> We simply let the canvas own
-      * it. Unfortunately, the window can only be created and destroyed by
-      * VisualizerEditor only (not the Canvas), and for those operations we pass
-      * ownership around. */
+    /** The dataWindow is _owned_ by this canvas, unlike DataWindows of other
+     * plugins. This is the only way editors can "share" it. Editors
+     * create/destroy DataWindow when the SelectorButton is pressed or the
+     * editor is deleted. When the DataWindow is owned by an editor, how would
+     * it pass ownership when it is deleted, so that window is not destroyed
+     * with it, to a sibling editor (if any)? <br> We simply let the canvas own
+     * it. Unfortunately, the window can only be created and destroyed by
+     * VisualizerEditor only (not the Canvas), and for those operations we pass
+     * ownership around.
+     */
     ScopedPointer<DataWindow> dataWindow;
     
     /** Contains information on the serial port config, as well as the Serial
      * Object. */
     cl_serial serialInfo;
-
+    /** Contains information about the Cyclops device which was found on the
+    selected serial port. */
+    ScopedPointer<CyclopsDeviceInfo> CLDevInfo;
+    bool serialIsVerified;
+    
     ScopedPointer<LEDChannelPort> ledChannelPort;
     ScopedPointer<ProgressBar> progressBar;
     // Some state vars for "TEST" UI
@@ -282,7 +288,7 @@ public:
     bool in_a_test;
     // LED links
     OwnedArray<Path> linkPaths;
-
+    
     ScopedPointer<code::CyclopsProgram> program;
     // Code Generation Decision Array
     std::map<int, bool> decisionMap;
@@ -290,7 +296,8 @@ private:
     
     // GUI stuff
     ScopedPointer<IndicatorLED>  devStatus;
-    ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device list */
+    ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device
+    list */
     ScopedPointer<ComboBox> portCombo;          /**< List of all available dvices */
     ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
 

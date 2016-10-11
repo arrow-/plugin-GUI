@@ -85,10 +85,12 @@ bool CyclopsProcessor::isReady()
         pluginInfo = cl_editor->refreshPluginInfo();
         plugin = pluginInfo->CyclopsPluginFactory();
 
-        isParticipating = true;
+        isParticipating = false;
     }
     // DBG (nodeId << " > orphan primed conclude (gen, flash) : " << isOrphan << isPrimed  << isParticipating << " E(" << genError << ", " << flashError << ") " << "\n");
-    return ((genError == 0) && (flashError == 0));
+    return ((genError == 0 || genError == 15) &&
+            (buildError == 0 || buildError == 15) &&
+            (flashError == 0 || flashError == 15));
 }
 
 void CyclopsProcessor::timerCallback()

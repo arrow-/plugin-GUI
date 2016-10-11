@@ -88,8 +88,12 @@ namespace cyclops
 {
 
 static const int RPC_HEADER_SZ = 1;
+static const int RPC_SUCCESSCODE_SZ = 1;
+static const int RPC_ERRORCODE_SZ = 1;
 static const int RPC_MAX_ARGS  = 4;
-static const int RPC_IDENTITY_SZ = 65;
+/** size of ((identity string) + (RPC success code)) */
+static const int RPC_IDENTITY_SUCCESSCODE_SZ = 27;
+static const int RPC_IDENTITY_SZ = RPC_IDENTITY_SUCCESSCODE_SZ - RPC_SUCCESSCODE_SZ;
 
 enum class operationMode
 {
@@ -103,6 +107,25 @@ enum class sourceType
     STORED,
     GENERATED,
     SQUARE
+};
+
+class CyclopsDeviceInfo
+{
+public:
+    CyclopsDeviceInfo(const unsigned char* id_str);
+    String toString();
+
+    uint8_t libMajor,
+            libMinor,
+            numWaveforms,
+            numChannels,
+            channelState[4];
+    bool isTeensy,
+         isArduino;
+    String devName,
+           identity;
+private:
+    void parseUnsignedChar(const unsigned char* id_str);
 };
 
 struct CyclopsRPC
@@ -170,14 +193,14 @@ enum multiByteLength
 
 enum returnCode
 {
-    CL_RC_LAUNCH,
-    CL_RC_END,
-    CL_RC_SBDONE,
-    CL_RC_MBDONE,
-    CL_RC_IDENTITY,
-    CL_RC_EA_FAIL,
-    CL_RC_NEA_FAIL,
-    CL_RC_UNKNOWN
+    CL_RC_LAUNCH = 0x00,
+    CL_RC_END = 0x01,
+    CL_RC_SBDONE = 0x10,
+    CL_RC_MBDONE = 0x20,
+    CL_RC_IDENTITY = 0x11,
+    CL_RC_EA_FAIL = 0xf0,
+    CL_RC_NEA_FAIL = 0xf1,
+    CL_RC_UNKNOWN = 0xff
 };
 
 /*

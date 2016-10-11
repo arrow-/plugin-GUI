@@ -36,6 +36,7 @@ const int CyclopsCanvas::BAUDRATES[12] = {300, 1200, 2400, 4800, 9600, 14400, 19
 CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
                                , realIndex(-1)
                                , dataWindow(nullptr)
+                               , serialIsVerified(false)
                                , progress(0)
                                , in_a_test(false)
 {
@@ -104,7 +105,8 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     refreshPlugins();
 
     //BEWARE
-    program = new code::ProgramTeensy32();
+    program = nullptr;
+    CLDevInfo = nullptr;
 }
 
 void CyclopsCanvas::refreshPlugins()
@@ -294,6 +296,17 @@ void CyclopsCanvas::buttonClicked(Button* button)
         // Refresh list of devices
         portCombo->clear();
         portCombo->addItemList(getDevices(), 1);
+        serialIsVerified = false;
+        CLDevInfo = nullptr;
+        program = nullptr;
+        for (int i=0; i<4; i++){
+            ledChannelPort->testButtons[i]->setEnabled(false);
+        }
+        if (serialInfo.portName != ""){
+            serialInfo.Serial->flush();
+            serialInfo.Serial->close();
+            serialInfo.portName = "";
+        }
     }
     else if (button == closeButton)
     {
@@ -343,29 +356,31 @@ bool CyclopsCanvas::keyPressed(const KeyPress& key)
 
 void CyclopsCanvas::timerCallback()
 {
-    int response;
+    returnCode response;
     while (serialInfo.Serial->available() > 0){
-        response = serialInfo.Serial->readByte();
+        response = (returnCode) serialInfo.Serial->readByte();
         switch (response){
-        case 0:   //CL_RC_LAUNCH
+        case CL_RC_LAUNCH:   //
         break;
 
-        case 1:   //CL_RC_END
+        case CL_RC_END:   //
         break;
 
-        case 8:   //CL_RC_SBDONE
+        case CL_RC_SBDONE:   //
         break;
 
-        case 9:   //CL_RC_IDENTITY
+        case CL_RC_IDENTITY:   //
         break;
 
-        case 16:  //CL_RC_MBDONE
+        case CL_RC_MBDONE:  //
         break;
 
-        case 240: //CL_RC_EA_FAIL
-        case 241: //CL_RC_NEA_FAIL
+        case CL_RC_EA_FAIL: //
+        case CL_RC_NEA_FAIL: //
             devStatus->update(CyclopsColours::notResponding, "Device sent an ErrorCode.");
             devStatus->repaint();
+        break;
+        case CL_RC_UNKNOWN:
         break;
         }
     }
@@ -416,29 +431,59 @@ CyclopsPluginInfo* CyclopsCanvas::getPluginInfoById(int node_id)
 void CyclopsCanvas::setDevice(string port)
 {
     serialInfo.portName = port;
-    if (serialInfo.portName != ""){
-        serialInfo.Serial->setup(serialInfo.portName, serialInfo.baudRate);
-        CyclopsRPC rpc;
-        identify(&rpc);
-        serialInfo.Serial->writeBytes(rpc.message, rpc.length);
-        
-        unsigned char identity[RPC_IDENTITY_SZ+1] = {0};
-        while (serialInfo.Serial->available() < RPC_IDENTITY_SZ);
-        serialInfo.Serial->readBytes(identity, RPC_IDENTITY_SZ);
+    if (serialInfo.portName != "")
+    {
+        if (serialInfo.Serial->setup(serialInfo.portName, serialInfo.baudRate))
+        {
+            CyclopsRPC rpc;
+            identify(&rpc);
+            serialInfo.Serial->writeBytes(rpc.message, rpc.length);
+            
+            unsigned char identity[RPC_IDENTITY_SUCCESSCODE_SZ] = {0};
+            DBG ("*CL* Contacting Cyclops device...");
+            // Wait upto 0.5 sec for Cyclops Device response.
+            int64 ctime = Time::currentTimeMillis();
+            while (ctime + 500 > Time::currentTimeMillis()){
+                if (serialInfo.Serial->available() >= RPC_IDENTITY_SUCCESSCODE_SZ)
+                    break;
+            }
+            int readBytes = serialInfo.Serial->readBytes(identity, RPC_IDENTITY_SUCCESSCODE_SZ);
+            //std::cout << readBytes << std::endl;
+            if (readBytes == RPC_IDENTITY_SUCCESSCODE_SZ && identity[RPC_IDENTITY_SUCCESSCODE_SZ-1] == CL_RC_IDENTITY){
+                CLDevInfo = new CyclopsDeviceInfo(identity);
+                // determine the kind of device
+                if (CLDevInfo->isTeensy){ // Teensy32
+                    program = new code::ProgramTeensy32();
+                }
+                /*
+                else if (CLDevInfo->isArduino) // Arduino
+                    program = new code::ProgramArduino();
+                */
 
-        std::cout << "*CL* Contacting Cyclops device..." << std::endl;
-        for (int i=0; i<RPC_IDENTITY_SZ-1-14; i++)
-            std::cout << identity[i];
-        std::cout << identity[52] << identity[55] << identity[58] << identity[61] << std::endl;
-        /*
-        if (identity[52] == '0')
-        if (identity[55] == '0')
-        if (identity[58] == '0')
-        if (identity[61] == '0')
-        */
-        // determine the kind of device: teensy, arduino, other
-        // JUST TEENSY FOR NOW
-        program = new code::ProgramTeensy32();
+                // Finally,
+                for (int i=0; i<4; i++){
+                    // enable the test buttons
+                    if (CLDevInfo->channelState[i] == 1){
+                        ledChannelPort->testButtons[i]->setEnabled(true);
+                    }
+                }
+                DBG ("*CL* [success] Device identified and prepared. [" << CLDevInfo->toString() << ")]");
+                CoreServices::sendStatusMessage("Cyclops Device identified and prepared.");
+                serialIsVerified = true;
+            }
+            else{
+                // (Serial Error) OR (port accessed but ((device not recognised) OR (device not responding) OR (device not pre-programmed))
+                CoreServices::sendStatusMessage("Unidentifiable device. See project FAQ for details!");
+                std::cout << "*CL* [warning] Device is not responding or has not been pre-programmed or is not a Cyclops Device!" << std::endl;
+                std::cout << "*CL* [fix]     If you are sure this is a Cyclops Device, ignore this message and continue." << std::endl;
+                serialIsVerified = false;
+            }
+        }
+        else{
+            CoreServices::sendStatusMessage("Error: Serial Port cannot be accesed");
+            std::cout << "*CL* [failure] Serial Port could not be accessed." << std::endl;
+            serialIsVerified = false;
+        }
     }
     canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
 }
@@ -536,32 +581,44 @@ bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
 
 bool CyclopsCanvas::generateCode(int& genError)
 {
-    Array<std::bitset<CLSTIM_NUM_PARAMS> > summaries;
-    std::vector<code::CyclopsHookConfig> hookInfoList;
-    getAllSummaries(hookInfoList, summaries);
+    if (program != nullptr){
+        Array<std::bitset<CLSTIM_NUM_PARAMS> > summaries;
+        std::vector<code::CyclopsHookConfig> hookInfoList;
+        getAllSummaries(hookInfoList, summaries);
 
-    code::CyclopsConfig config(hookInfoList, summaries);
-    return program->create(config, genError);
+        code::CyclopsConfig config(hookInfoList, summaries);
+        return program->create(config, genError);
+    }
+    genError = 15; // program object not created!
+    return false;
 }
 
 bool CyclopsCanvas::buildCode(int& buildError)
 {
-    if (program->currentHash != 0)
-        return program->build(buildError);
-    else{
-        buildError = 1;
-        return false;
+    if (program != nullptr){
+        if (program->currentHash != 0)
+            return program->build(buildError);
+        else{
+            buildError = 1;
+            return false;
+        }
     }
+    buildError = 15; // program object not created!
+    return false;
 }
 
 bool CyclopsCanvas::flashDevice(int& flashError)
 {
-    if (program->currentHash != 0)
-        return program->flash(flashError, realIndex);
-    else{
-        flashError = 1;
-        return false;
+    if (program != nullptr){
+        if (program->currentHash != 0)
+            return program->flash(flashError, realIndex);
+        else{
+            flashError = 1;
+            return false;
+        }
     }
+    flashError = 15; // program object not created!
+    return false;
 }
 
 
@@ -754,6 +811,7 @@ LEDChannelPort::LEDChannelPort(CyclopsCanvas* parent) : canvas(parent)
     // Add buttons
     for (int i=0; i < 4; i++){
         testButtons.add(new UtilityButton(String("Test ") + String(i), Font("Default", 11, Font::bold)));
+        testButtons[i]->setEnabled(false);
         testButtons[i]->addListener(this);
         addAndMakeVisible(testButtons[i]);
         
