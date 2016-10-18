@@ -98,6 +98,7 @@ public:
 	static String arduinoPath,
 		   		  deviceDir,
 		   		  arduinoLibPath;
+	static int reconDuration;
 
 protected:
 	inline File getFileFromExeDir(const String& pathFromExeDir);

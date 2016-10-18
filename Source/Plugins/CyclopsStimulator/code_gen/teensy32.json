@@ -13,6 +13,6 @@
     ],
 
     "loop": [
-        "void loop()\n{\n  if (cyclops::AquisitionStatus == false){\n    // waiting for 'launch' from PC\n    cyclops::readSerialAndPush(&processQueue);\n    if (processQueue.size > 0){\n      cyclops::Task* t = processQueue.peek();\n      t->checkAndCompute();\n      processQueue.pop();\n    }\n  }\n  \n  else{\n    launch();\n    runExperiment();\n    end();\n  }\n}\n"
+        "void loop()\n{\n  if (cyclops::AquisitionStatus == false){\n    // waiting for 'launch' from PC\n    cyclops::readSerialAndPush(&processQueue);\n    if (processQueue.size > 0){\n      cyclops::Task* t = processQueue.peek();\n      t->compute();\n      processQueue.pop();\n    }\n  }\n  \n  else{\n    launch();\n    runExperiment();\n    end();\n  }\n}\n"
     ]
 }

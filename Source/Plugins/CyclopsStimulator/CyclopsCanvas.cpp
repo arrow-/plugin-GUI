@@ -100,8 +100,7 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     progressBar = new ProgressBar(progress);
     progressBar->setPercentageDisplay(false);
     addChildComponent(progressBar);
-    pstep = 0.01;
-    // communicate with teensy?
+    pstep = 0.00565; // +40ms
     refreshPlugins();
 
     //BEWARE
@@ -360,23 +359,26 @@ void CyclopsCanvas::timerCallback()
     while (serialInfo.Serial->available() > 0){
         response = (returnCode) serialInfo.Serial->readByte();
         switch (response){
-        case CL_RC_LAUNCH:   //
+        case CL_RC_LAUNCH:
         break;
 
-        case CL_RC_END:   //
+        case CL_RC_END:
         break;
 
-        case CL_RC_SBDONE:   //
+        case CL_RC_TEST:
         break;
 
-        case CL_RC_IDENTITY:   //
+        case CL_RC_SBDONE:
         break;
 
-        case CL_RC_MBDONE:  //
+        case CL_RC_IDENTITY:
         break;
 
-        case CL_RC_EA_FAIL: //
-        case CL_RC_NEA_FAIL: //
+        case CL_RC_MBDONE:
+        break;
+
+        case CL_RC_EA_FAIL:
+        case CL_RC_NEA_FAIL:
             devStatus->update(CyclopsColours::notResponding, "Device sent an ErrorCode.");
             devStatus->repaint();
         break;
@@ -435,22 +437,7 @@ void CyclopsCanvas::setDevice(string port)
     {
         if (serialInfo.Serial->setup(serialInfo.portName, serialInfo.baudRate))
         {
-            CyclopsRPC rpc;
-            identify(&rpc);
-            serialInfo.Serial->writeBytes(rpc.message, rpc.length);
-            
-            unsigned char identity[RPC_IDENTITY_SUCCESSCODE_SZ] = {0};
-            DBG ("*CL* Contacting Cyclops device...");
-            // Wait upto 0.5 sec for Cyclops Device response.
-            int64 ctime = Time::currentTimeMillis();
-            while (ctime + 500 > Time::currentTimeMillis()){
-                if (serialInfo.Serial->available() >= RPC_IDENTITY_SUCCESSCODE_SZ)
-                    break;
-            }
-            int readBytes = serialInfo.Serial->readBytes(identity, RPC_IDENTITY_SUCCESSCODE_SZ);
-            //std::cout << readBytes << std::endl;
-            if (readBytes == RPC_IDENTITY_SUCCESSCODE_SZ && identity[RPC_IDENTITY_SUCCESSCODE_SZ-1] == CL_RC_IDENTITY){
-                CLDevInfo = new CyclopsDeviceInfo(identity);
+            if (getDeviceIdentity()){
                 // determine the kind of device
                 if (CLDevInfo->isTeensy){ // Teensy32
                     program = new code::ProgramTeensy32();
@@ -475,7 +462,10 @@ void CyclopsCanvas::setDevice(string port)
                 // (Serial Error) OR (port accessed but ((device not recognised) OR (device not responding) OR (device not pre-programmed))
                 CoreServices::sendStatusMessage("Unidentifiable device. See project FAQ for details!");
                 std::cout << "*CL* [warning] Device is not responding or has not been pre-programmed or is not a Cyclops Device!" << std::endl;
-                std::cout << "*CL* [fix]     If you are sure this is a Cyclops Device, ignore this message and continue." << std::endl;
+                if (AlertWindow::showOkCancelBox (AlertWindow::QuestionIcon, "Choose Controller", "What is controlling the Cyclops Device?", "Teensy", "Arduino"))
+                    program = new code::ProgramTeensy32();
+                else
+                    program = nullptr;//new code::ProgramArduino();
                 serialIsVerified = false;
             }
         }
@@ -486,6 +476,29 @@ void CyclopsCanvas::setDevice(string port)
         }
     }
     canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
+}
+
+bool CyclopsCanvas::getDeviceIdentity()
+{
+    api::CyclopsRPC rpc;
+    api::identify(&rpc);
+    serialInfo.Serial->writeBytes(rpc.message, rpc.length);
+    
+    unsigned char identity[RPC_IDENTITY_SUCCESSCODE_SZ] = {0};
+    DBG ("*CL* Contacting Cyclops device...");
+    // Wait upto 0.5 sec for Cyclops Device response.
+    int64 ctime = Time::currentTimeMillis();
+    while (ctime + 500 > Time::currentTimeMillis()){
+        if (serialInfo.Serial->available() >= RPC_IDENTITY_SUCCESSCODE_SZ)
+            break;
+    }
+    int readBytes = serialInfo.Serial->readBytes(identity, RPC_IDENTITY_SUCCESSCODE_SZ);
+    //DBG (readBytes);
+    if (readBytes == RPC_IDENTITY_SUCCESSCODE_SZ && identity[RPC_IDENTITY_SUCCESSCODE_SZ-1] == CL_RC_IDENTITY){
+        CLDevInfo = new CyclopsDeviceInfo(identity);
+        return true;
+    }
+    return false;
 }
 
 void CyclopsCanvas::setBaudrate(int baudrate)
@@ -610,8 +623,45 @@ bool CyclopsCanvas::buildCode(int& buildError)
 bool CyclopsCanvas::flashDevice(int& flashError)
 {
     if (program != nullptr){
-        if (program->currentHash != 0)
-            return program->flash(flashError, realIndex);
+        serialInfo.Serial->flush();
+        serialInfo.Serial->close();
+        if (program->currentHash != 0){
+            if (program->flash(flashError, realIndex)){
+                DBG (program->reconDuration);
+                // Wait for some time, give teensy time to reconnect after flashing.
+                int64 ctime = Time::currentTimeMillis();
+                while (ctime + program->reconDuration > Time::currentTimeMillis());
+                std::cout << "\n";
+                if (serialInfo.Serial->setup(serialInfo.portName, serialInfo.baudRate)){
+                    if (getDeviceIdentity()){
+                        for (int i=0; i<4; i++){
+                            // enable the test buttons
+                            if (CLDevInfo->channelState[i] == 1){
+                                ledChannelPort->testButtons[i]->setEnabled(true);
+                            }
+                        }
+                        serialIsVerified = true;
+                        return true;
+                    }
+                    else{
+                        serialIsVerified = false;
+                        canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
+                        flashError = 14; // flashed but no response!
+                        CoreServices::sendStatusMessage("[Error] Cyclops Device did not respond. Try refreshing Serial Port.");
+                        DBG ("*CL* [Error] Cyclops Device did not respond. Try refreshing Serial Port.");
+                        return false;
+                    }
+                }
+                else{
+                    serialIsVerified = false;
+                    canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
+                    flashError = 13; // flashed but couldn't reconnect!
+                    CoreServices::sendStatusMessage("[Error] Cyclops Device did not respond [WORMHOLE]");
+                    DBG ("*CL* [Error] Cyclops Device did not respond. This might be the WORMHOLE condition.");
+                    return false;
+                }
+            }
+        }
         else{
             flashError = 1;
             return false;
@@ -865,17 +915,23 @@ void LEDChannelPort::buttonClicked(Button* button)
         }
     }
     if (test_index >= 0){
-        canvas->disableAllInputWidgets();
-        canvas->broadcastEditorInteractivity(CanvasEvent::FREEZE);
-        std::cout << "*CL* Testing LED channel " << test_index << "\n";
-        canvas->in_a_test = true;
-        //serialInfo.Serial->testChannel(test_index);
-        canvas->progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
-        canvas->progressBar->setVisible(true);
-        startTimer(20);
-        test_index = -1;
-        for (int i=0; i<4; i++)
-            testButtons[i]->setEnabled(false);
+        api::CyclopsRPC rpc;
+        if (api::test(&rpc, test_index)){
+            canvas->disableAllInputWidgets();
+            canvas->broadcastEditorInteractivity(CanvasEvent::FREEZE);
+            for (int i=0; i<4; i++)
+                testButtons[i]->setEnabled(false);
+            CoreServices::sendStatusMessage("Testing LED channel " + String(test_index) + "...");
+            canvas->in_a_test = true;            
+            canvas->progressBar->setTextToDisplay("Testing LED channel" + String(test_index));
+            canvas->progressBar->setVisible(true);
+            startTimer(20);
+            canvas->serialInfo.Serial->writeBytes(rpc.message, rpc.length);
+            test_index = -1;
+        }
+        else{
+            CoreServices::sendStatusMessage("CyclopsAPI::test [Error] Invalid channel index");
+        }
     }
     else{
         test_index = -1;
@@ -901,7 +957,7 @@ void LEDChannelPort::timerCallback()
 {
     if (canvas->in_a_test){
         canvas->progress += canvas->pstep;
-        if (canvas->progress >= 1.0){
+        if (canvas->progress >= 1){
             canvas->progressBar->setVisible(false);
             canvas->progress = 0;
             canvas->in_a_test = false;

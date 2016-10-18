@@ -152,7 +152,7 @@ public:
     CyclopsPluginInfo* getPluginInfoById(int node_id);
     /** Setter, that allows you to set the serial device that will be used during acquisition */
     void setDevice(string device);
-
+    bool getDeviceIdentity();
     /** Setter, that allows you to set the baudrate that will be used during acquisition */
     void setBaudrate(int baudrate);
 

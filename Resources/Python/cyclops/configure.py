@@ -52,6 +52,7 @@ print('Setting `ARDUINO_LIB_PATH` to `%s`\n' % config['arduinoLibPath']);
 
 config['outDir'] = args.outdir
 config['deviceDir'] = os.path.normpath(os.path.join(os.path.join(args.outdir, "../intermediate/device")))
+config['reconDuration'] = 3000
 
 with open(cfile, 'w') as fout:
 	fout.write(json.dumps(config, indent=4));

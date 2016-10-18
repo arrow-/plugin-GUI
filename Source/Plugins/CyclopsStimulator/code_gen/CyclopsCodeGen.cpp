@@ -72,6 +72,7 @@ bool CyclopsProgram::readBuildConfig = true;
 String CyclopsProgram::arduinoPath = "";
 String CyclopsProgram::deviceDir = "";
 String CyclopsProgram::arduinoLibPath = "";
+int CyclopsProgram::reconDuration = 2000;
 
 CyclopsProgram::CyclopsProgram( const String& deviceName) : device(deviceName)
                                                           , currentHash(0)
@@ -87,6 +88,7 @@ CyclopsProgram::CyclopsProgram( const String& deviceName) : device(deviceName)
         arduinoPath    = code_gen_config["arduinoPath"].toString();
         deviceDir      = code_gen_config["deviceDir"].toString();
         arduinoLibPath = code_gen_config["arduinoLibPath"].toString();
+        reconDuration  = (int)code_gen_config["reconDuration"];
     }
 }
 

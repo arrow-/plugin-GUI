@@ -34,7 +34,7 @@ struct convert<cyclops::CyclopsSignal> {
     return true;
   }
 };
-}
+} // NAMESPACE yaml
 
 
 namespace cyclops
@@ -132,7 +132,7 @@ const CyclopsSignal& CyclopsSignal::getSignalByIndex(int index)
 
 
 
-
+namespace api{
 
 /*
   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
@@ -142,6 +142,10 @@ const CyclopsSignal& CyclopsSignal::getSignalByIndex(int index)
 
 bool start (CyclopsRPC *rpc, const int *channels, int channelCount)
 {
+    for (int i=0; i<channelCount; i++){
+        if (channels[i] < 0 || channels[i] > 3)
+            return false;
+    }
     rpc->message[0] = getSingleByteHeader(channels, channelCount) | CL_SB_START;
     rpc->length = 1;
     return true;
@@ -149,6 +153,10 @@ bool start (CyclopsRPC *rpc, const int *channels, int channelCount)
 
 bool stop (CyclopsRPC *rpc, const int *channels, int channelCount)
 {
+    for (int i=0; i<channelCount; i++){
+        if (channels[i] < 0 || channels[i] > 3)
+            return false;
+    }
     rpc->message[0] = getSingleByteHeader(channels, channelCount) | CL_SB_STOP;
     rpc->length = 1;
     return true;
@@ -156,6 +164,10 @@ bool stop (CyclopsRPC *rpc, const int *channels, int channelCount)
 
 bool reset (CyclopsRPC *rpc, const int *channels, int channelCount)
 {
+    for (int i=0; i<channelCount; i++){
+        if (channels[i] < 0 || channels[i] > 3)
+            return false;
+    }
     rpc->message[0] = getSingleByteHeader(channels, channelCount) | CL_SB_RESET;
     rpc->length = 1;
     return true;
@@ -163,10 +175,13 @@ bool reset (CyclopsRPC *rpc, const int *channels, int channelCount)
 
 bool swap (CyclopsRPC *rpc, int c1, int c2)
 {
-    int ch[] = {c1, c2};
-    rpc->message[0] = getSingleByteHeader(ch, 2) | CL_SB_SWAP;
-    rpc->length = 1;
-    return true;
+    if (c1 > -1 && c1 < 4 && c1 != c2 && c2 > -1 && c2 < 4){
+        int ch[] = {c1, c2};
+        rpc->message[0] = getSingleByteHeader(ch, 2) | CL_SB_SWAP;
+        rpc->length = 1;
+        return true;
+    }
+    return false;
 }
 
 bool launch (CyclopsRPC *rpc)
@@ -181,6 +196,16 @@ bool end (CyclopsRPC *rpc)
     rpc->message[0] = CL_SB_END | (1 << 7);
     rpc->length = 1;
     return true;
+}
+
+bool test(CyclopsRPC *rpc, int channel)
+{
+    if (channel > -1 && channel < 4){
+        rpc->message[0] = CL_SB_TEST | (1 << 7);
+        rpc->length = 1;
+        return true;
+    }
+    return false;
 }
 
 bool identify (CyclopsRPC *rpc)
@@ -294,4 +319,5 @@ bool square_off_level (CyclopsRPC *rpc, int channel, uint16_t offLevel)
     return true;
 }
 
+} // NAMESPACE cyclops-api
 } // NAMESPACE cyclops
