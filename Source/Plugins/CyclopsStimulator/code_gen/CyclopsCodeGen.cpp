@@ -42,37 +42,16 @@ bool operator==(const CyclopsConfig& lhs, const CyclopsConfig& rhs)
 }
 
 
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                               CYCLOPS-PROGRAM                            |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-bool CyclopsProgram::readBuildConfig = true;
-String CyclopsProgram::arduinoPath = "";
-String CyclopsProgram::deviceDir = "";
-String CyclopsProgram::arduinoLibPath = "";
-int CyclopsProgram::reconDuration = 2000;
+bool   CyclopsProgram::readBuildConfig = true;
+String CyclopsProgram::arduinoPath     = "";
+String CyclopsProgram::deviceDir       = "";
+String CyclopsProgram::arduinoLibPath  = "";
+int    CyclopsProgram::reconDuration   = 2000;
 
 CyclopsProgram::CyclopsProgram( const String& deviceName) : device(deviceName)
                                                           , currentHash(0)

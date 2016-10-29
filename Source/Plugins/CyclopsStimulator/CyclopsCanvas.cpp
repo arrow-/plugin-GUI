@@ -59,9 +59,6 @@ CyclopsCanvas::CyclopsCanvas() : tabIndex(-1)
     baudrateCombo->addListener(this);
     baudrateCombo->setTooltip("Set the baud rate (115200 recommended).");
 
-    devStatus = new IndicatorLED(CyclopsColours::disconnected, Colours::black);
-    addChildComponent(devStatus);
-
     Array<int> baudrates(getBaudrates());
     for (int i = 0; i < baudrates.size(); i++)
     {
@@ -127,10 +124,7 @@ void CyclopsCanvas::beginAnimation()
     //DBG ("CyclopsCanvas beginning animation.\n");
     disableAllInputWidgets();
     if (serialInfo.portName != ""){
-        // serialInfo->Serial.writeByte(<launch>);
-        devStatus->update(CyclopsColours::connected, "Device is in sync!");
-        devStatus->setVisible(true);
-        devStatus->repaint();
+        ;
     }
     //startTimer(40);
 }
@@ -139,7 +133,6 @@ void CyclopsCanvas::endAnimation()
 {
     //DBG ("CyclopsCanvas ending animation.\n");
     enableAllInputWidgets();
-    devStatus->setVisible(false);
     stopTimer();
 }
 
@@ -246,7 +239,8 @@ void CyclopsCanvas::dropEditor(CyclopsCanvas* closingCanvas, int node_id)
 {
     CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(closingCanvas, node_id);
     jassert (listener != nullptr);
-    listener->updateIndicators(CanvasEvent::TRANSFER_DROP);
+    listener->updateReadinessIndicator(CanvasEvent::TRANSFER_DROP);
+    listener->updateSerialIndicator(CanvasEvent::TRANSFER_DROP);
     listener->changeCanvas(nullptr);
 }
 
@@ -379,8 +373,6 @@ void CyclopsCanvas::timerCallback()
 
         case CL_RC_EA_FAIL:
         case CL_RC_NEA_FAIL:
-            devStatus->update(CyclopsColours::notResponding, "Device sent an ErrorCode.");
-            devStatus->repaint();
         break;
         case CL_RC_UNKNOWN:
         break;
@@ -437,6 +429,7 @@ void CyclopsCanvas::setDevice(string port)
     {
         if (serialInfo.Serial->setup(serialInfo.portName, serialInfo.baudRate))
         {
+            serialInfo.Serial->flush();
             if (getDeviceIdentity()){
                 // determine the kind of device
                 if (CLDevInfo->isTeensy){ // Teensy32
@@ -475,7 +468,7 @@ void CyclopsCanvas::setDevice(string port)
             serialIsVerified = false;
         }
     }
-    canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
+    canvasEventListeners.call(&CyclopsCanvas::Listener::updateSerialIndicator, CanvasEvent::SERIAL);
 }
 
 bool CyclopsCanvas::getDeviceIdentity()
@@ -563,7 +556,7 @@ void CyclopsCanvas::getAllSummaries(std::vector<code::CyclopsHookConfig>& hookIn
 }
 
 // This is only called by CyclopsEditor::isReadyForLaunch()
-// there's another private function with same name!
+// there's another static function with same name!
 bool CyclopsCanvas::getSummary(int node_id, bool& isPrimed)
 {
     std::bitset<CLSTIM_NUM_PARAMS> summary;
@@ -645,7 +638,7 @@ bool CyclopsCanvas::flashDevice(int& flashError)
                     }
                     else{
                         serialIsVerified = false;
-                        canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
+                        canvasEventListeners.call(&CyclopsCanvas::Listener::updateSerialIndicator, CanvasEvent::SERIAL);
                         flashError = 14; // flashed but no response!
                         CoreServices::sendStatusMessage("[Error] Cyclops Device did not respond. Try refreshing Serial Port.");
                         DBG ("*CL* [Error] Cyclops Device did not respond. Try refreshing Serial Port.");
@@ -654,7 +647,7 @@ bool CyclopsCanvas::flashDevice(int& flashError)
                 }
                 else{
                     serialIsVerified = false;
-                    canvasEventListeners.call(&CyclopsCanvas::Listener::updateIndicators, CanvasEvent::SERIAL_LED);
+                    canvasEventListeners.call(&CyclopsCanvas::Listener::updateSerialIndicator, CanvasEvent::SERIAL);
                     flashError = 13; // flashed but couldn't reconnect!
                     CoreServices::sendStatusMessage("[Error] Cyclops Device did not respond [WORMHOLE]");
                     DBG ("*CL* [Error] Cyclops Device did not respond. This might be the WORMHOLE condition.");
@@ -742,10 +735,18 @@ void CyclopsCanvas::broadcastEditorInteractivity(CanvasEvent interactivity)
     canvasEventListeners.call(&CyclopsCanvas::Listener::setInteractivity, interactivity);
 }
 
-void CyclopsCanvas::unicastPluginIndicator(CanvasEvent pluginState, int node_id)
+void CyclopsCanvas::broadcastIndicatorLED(int LEDtype, CanvasEvent event, int attribute)
+{
+    if (LEDtype == 0)
+        canvasEventListeners.call(&CyclopsCanvas::Listener::updateReadinessIndicator, event, attribute);
+    else if (LEDtype == 1)
+        canvasEventListeners.call(&CyclopsCanvas::Listener::updateSerialIndicator, event);
+}
+
+void CyclopsCanvas::unicastPluginSelected(CanvasEvent pluginState, int node_id)
 {
     CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
-    listener->updateIndicators(CanvasEvent::PLUGIN_SELECTED);
+    listener->updateReadinessIndicator(CanvasEvent::PLUGIN_SELECTED);
 }
 
 void CyclopsCanvas::unicastUpdatePluginInfo(int node_id)
@@ -808,45 +809,12 @@ CyclopsCanvas::Listener* CyclopsCanvas::findListenerById(CyclopsCanvas* cc, int 
     return nullptr;
 }
 
-/*
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-  |                                 INDICATOR LEDS                                |
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-*/
-
-IndicatorLED::IndicatorLED(const Colour& fill, const Colour& line)
-{
-    fillColour = fill;
-    lineColour = line;
-}
-
-void IndicatorLED::paint(Graphics& g)
-{
-    g.setColour(fillColour);
-    g.fillEllipse(1, 1, getWidth()-2, getHeight()-2);
-    g.setColour(lineColour);
-    g.drawEllipse(1, 1, getWidth()-2, getHeight()-2, 1.2);
-}
-
-void IndicatorLED::update(const Colour& fill, String tooltip)
-{
-    fillColour = fill;
-    setTooltip(tooltip);
-}
-
-void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip)
-{
-    fillColour = fill;
-    lineColour = line;
-    setTooltip(tooltip);
-}
 
 /*
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-  |                               LED CHANNEL PORT                                |
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  +###########################################################################+
+  ||                             LED CHANNEL PORT                            ||
+  +###########################################################################+
 */
-
 
 LEDChannelPort::LEDChannelPort(CyclopsCanvas* parent) : canvas(parent)
                                                       , mouseOverIndex(-1)
@@ -1066,53 +1034,11 @@ void LEDChannelPort::addConnection(Component* dragSourceComponent)
     canvas->redrawLinks();
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                               HOOK VIEWPORT                             ||
+  +###########################################################################+
+*/
 
 HookViewport::HookViewport(HookViewDisplay* display) : hvDisplay(display)
 {
@@ -1157,21 +1083,11 @@ void HookViewport::paint(Graphics& g)
 {
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                             HOOK VIEW DISPLAY                           ||
+  +###########################################################################+
+*/
 
 HookViewDisplay::HookViewDisplay(CyclopsCanvas* _canvas) : canvas(_canvas)
                                                          , height(45)
@@ -1230,17 +1146,11 @@ void HookViewDisplay::enableAllInputWidgets()
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                                  HOOK INFO                              ||
+  +###########################################################################+
+*/
 
 HookInfo::HookInfo(int node_id) : nodeId(node_id)
                                 , LEDChannel(-1)
@@ -1249,12 +1159,10 @@ HookInfo::HookInfo(int node_id) : nodeId(node_id)
     ;
 }
 
-
-
 /*
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
-  |                                HOOK-CONNECTOR                                 |
-  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  +###########################################################################+
+  ||                                HOOK CONNECTOR                           ||
+  +###########################################################################+
 */
 
 HookConnector::HookConnector(HookView* hv) : isDragging(false)
@@ -1313,9 +1221,11 @@ void HookConnector::mouseUp(const MouseEvent &event)
     repaint();
 }
 
-
-
-
+/*
+  +###########################################################################+
+  ||                                  HOOK VIEW                              ||
+  +###########################################################################+
+*/
 HookView::HookView(int node_id) : nodeId(node_id)
                                 , dragShouldDraw(true)
                                 , isDragging(false)
@@ -1348,7 +1258,7 @@ HookView::HookView(int node_id) : nodeId(node_id)
 void HookView::comboBoxChanged(ComboBox* cb)
 {
     HookViewDisplay* parent = getParentDisplay();
-    parent->canvas->unicastPluginIndicator(CanvasEvent::PLUGIN_SELECTED, nodeId);
+    parent->canvas->unicastPluginSelected(CanvasEvent::PLUGIN_SELECTED, nodeId);
     parent->canvas->unicastUpdatePluginInfo(nodeId);
     //DBG (cb->getSelectedItemIndex() << "\n");
     String name = cb->getItemText(cb->getSelectedItemIndex());
@@ -1625,15 +1535,11 @@ HookViewDisplay* HookView::getParentDisplay()
     return findParentComponentOfClass<HookViewDisplay>();
 }
 
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                               SIGNAL BUTTON                             ||
+  +###########################################################################+
+*/
 
 SignalButton::SignalButton(int index, SignalView* parent) : ShapeButton(String(index), Colours::black, Colours::black, Colours::black)
                                                           , signalIndex(index)
@@ -1689,7 +1595,11 @@ void SignalButton::paintButton(Graphics& g, bool isMouseOverButton, bool isButto
                     , 1.0);
 }
 
-
+/*
+  +###########################################################################+
+  ||                                 SIGNAL VIEW                             ||
+  +###########################################################################+
+*/
 
 SignalView::SignalView(int index, SignalDisplay *parent) : signalIndex(index)
                                                          , parentDisplay(parent)
@@ -1730,6 +1640,12 @@ void SignalView::dragDone(SignalButton* sb)
 {
     parentDisplay->dragDone(sb);
 }
+
+/*
+  +###########################################################################+
+  ||                              SIGNAL DISPLAY                             ||
+  +###########################################################################+
+*/
 
 SignalDisplay::SignalDisplay(CyclopsCanvas *cc) : canvas(cc)
                                                 , isDragging(false)
@@ -1805,13 +1721,11 @@ void SignalDisplay::resized()
 
 }
 
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                              SIGNAL VIEWPORT                            ||
+  +###########################################################################+
+*/
 
 SignalViewport::SignalViewport(SignalDisplay* sd) : signalDisplay(sd)
 {
@@ -1823,13 +1737,11 @@ void SignalViewport::paint(Graphics& g)
 {
 }
 
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                            MIGRATE COMPONENT                            ||
+  +###########################################################################+
+*/
 
 MigrateComponent::MigrateComponent(CyclopsCanvas* closing_canvas) : closingCanvas(closing_canvas)
 {

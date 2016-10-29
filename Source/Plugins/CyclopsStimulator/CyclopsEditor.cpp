@@ -42,7 +42,7 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
         // BUT canvas may not have any listeners.
         connectedCanvas = CyclopsCanvas::canvasList.getFirst();
         updateSelectorButtons();
-        updateIndicators(CanvasEvent::SERIAL_LED);
+        updateSerialIndicator(CanvasEvent::SERIAL);
     }
     jassert(connectedCanvas != nullptr);
     // listen to events from canvas
@@ -108,7 +108,6 @@ CyclopsEditor::~CyclopsEditor()
  * @                                           @
  * @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
  */
-// we never need this method.
 Visualizer* CyclopsEditor::createNewCanvas()
 {
     // VisualizerEditor calls this in buttonClicked() If someone changes
@@ -297,24 +296,30 @@ void CyclopsEditor::isReadyForLaunch(bool& isOrphan, bool& isPrimed, int& genErr
         if (connectedCanvas->getSummary(nodeId, isPrimed)){
             if (connectedCanvas->generateCode(genError)){
                 std::cout << "Generated\n";
+                connectedCanvas->broadcastIndicatorLED(0, CanvasEvent::CODE_GEN, 0);
                 if (connectedCanvas->buildCode(buildError)){
                     std::cout << "Compiled\n";
+                    connectedCanvas->broadcastIndicatorLED(0, CanvasEvent::BUILD, 0);
                     if (connectedCanvas->flashDevice(flashError)){
                         std::cout << "Flashed\n";
+                        connectedCanvas->broadcastIndicatorLED(0, CanvasEvent::FLASH, 0);
                     }
                     else{
                         std::cout << "\n\t*CL:Code* Flash FAIL (code=" << flashError << ")\n";
+                        connectedCanvas->broadcastIndicatorLED(0, CanvasEvent::FLASH, 1);
                     }
                 }
                 else{
                     std::cout << "\n\t*CL:Code* Compilation FAIL (code=" << buildError <<")\n";
                     flashError = 0;
+                    connectedCanvas->broadcastIndicatorLED(0, CanvasEvent::BUILD, 1);
                 }
             }
             else{
                 std::cout << "\n\t*CL:Code* Generation FAIL (code=" << genError << ")\n";
                 buildError = 0;
                 flashError = 0;
+                connectedCanvas->broadcastIndicatorLED(0, CanvasEvent::CODE_GEN, 1);
             }
         }
         else{
@@ -348,14 +353,14 @@ void CyclopsEditor::updateSettings()
     ;
 }
 
-void CyclopsEditor::updateIndicators(CanvasEvent event)
+void CyclopsEditor::updateSerialIndicator(CanvasEvent event)
 {
     // read connectedCanvas state
     if (event == CanvasEvent::TRANSFER_DROP){
         serialLED->update(Colours::black, "Invalid State");
         readinessLED->update(Colours::black, "Invalid State");
     }
-    else if (event == CanvasEvent::SERIAL_LED){
+    else if (event == CanvasEvent::SERIAL){
         if (isSerialConnected())
             if (connectedCanvas->serialIsVerified)
                 serialLED->update(CyclopsColours::connected, "Connected");
@@ -364,10 +369,32 @@ void CyclopsEditor::updateIndicators(CanvasEvent event)
         else
             serialLED->update(CyclopsColours::disconnected, "Not Connected");
     }
-    else if (event == CanvasEvent::PLUGIN_SELECTED){
-        readinessLED->update(CyclopsColours::Ready, "Just fill the channel mux here.");
-    }
     serialLED->repaint();
+}
+
+void CyclopsEditor::updateReadinessIndicator(CanvasEvent event, int attribute=0)
+{
+    if (event == CanvasEvent::CODE_GEN){
+        if (attribute == 0)
+            readinessLED->update(CyclopsColours::Ready, "Code Generation successful!");
+        else
+            readinessLED->update(CyclopsColours::errorGenFlash, "Code Generation failed!");
+    }
+    else if (event == CanvasEvent::BUILD){
+        if (attribute == 0)
+            readinessLED->update(CyclopsColours::Ready, "Code Generation and Compilation successful!");
+        else
+            readinessLED->update(CyclopsColours::errorGenFlash, "Compilation failed!");
+    }
+    else if (event == CanvasEvent::FLASH){
+        if (attribute == 0)
+            readinessLED->update(CyclopsColours::Ready, "Code Generation and Flashing  successful!");
+        else
+            readinessLED->update(CyclopsColours::errorGenFlash, "Flashing failed!");
+    }
+    else if (event == CanvasEvent::PLUGIN_SELECTED){
+        readinessLED->update(CyclopsColours::pluginSelected, "Plugin Selected, now configure it.");
+    }
     readinessLED->repaint();
 }
 
@@ -485,6 +512,40 @@ void CyclopsEditor::updateSelectorButtons()
         windowSelector->setToggleState(true, dontSendNotification);
     else
         windowSelector->setToggleState(false, dontSendNotification);
+}
+
+
+/*
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+  |                                 INDICATOR LEDS                                |
+  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+*/
+
+IndicatorLED::IndicatorLED(const Colour& fill, const Colour& line)
+{
+    fillColour = fill;
+    lineColour = line;
+}
+
+void IndicatorLED::paint(Graphics& g)
+{
+    g.setColour(fillColour);
+    g.fillEllipse(1, 1, getWidth()-2, getHeight()-2);
+    g.setColour(lineColour);
+    g.drawEllipse(1, 1, getWidth()-2, getHeight()-2, 1.2);
+}
+
+void IndicatorLED::update(const Colour& fill, String tooltip)
+{
+    fillColour = fill;
+    setTooltip(tooltip);
+}
+
+void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip)
+{
+    fillColour = fill;
+    lineColour = line;
+    setTooltip(tooltip);
 }
 
 } // NAMESPACE cyclops

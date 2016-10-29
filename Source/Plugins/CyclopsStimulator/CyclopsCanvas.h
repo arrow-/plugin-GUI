@@ -40,21 +40,24 @@
 namespace cyclops {
     namespace CyclopsColours{
     const Colour disconnected(0xffff3823);
-    const Colour notResponding(0xffffa834);
     const Colour notVerified(0xff3d64ff);
     const Colour connected(0xffc1d045);
+    const Colour errorGenFlash(0xffff7400);
     const Colour notReady       = disconnected;
     const Colour Ready          = connected;
+    const Colour pluginSelected = notVerified;
     }
 
 enum class CanvasEvent{
     WINDOW_BUTTON,
     TAB_BUTTON,
     COMBO_BUTTON,
-    SERIAL_LED,
+    SERIAL,
     PLUGIN_SELECTED,
+    CODE_GEN,
+    BUILD,
+    FLASH,
     TRANSFER_DROP,
-    TRANSFER_MIGRATE,
     FREEZE,
     THAW,
 };
@@ -100,7 +103,8 @@ public:
 
     class Listener{
     public:
-        virtual void updateIndicators(CanvasEvent LEDtype) = 0;
+        virtual void updateSerialIndicator(CanvasEvent event) = 0;
+        virtual void updateReadinessIndicator(CanvasEvent event, int attribute=0) = 0;
         virtual CyclopsPluginInfo* refreshPluginInfo() = 0;
         virtual bool channelMapStatus() = 0;
         virtual void changeCanvas(CyclopsCanvas* dest) = 0;
@@ -150,12 +154,41 @@ public:
     void timerCallback();
 
     CyclopsPluginInfo* getPluginInfoById(int node_id);
-    /** Setter, that allows you to set the serial device that will be used during acquisition */
+    /**
+     * @brief      Sets the serial device that will be used during acquisition.
+     *             It also tries communicating with the device, to determine
+     *             it's identity and status.
+     *
+     * @param[in]  device  The device name. Follows the usual format:
+     *                     * ``/dev/ttyXXX``
+     *                     * ``/dev/COMY``
+     */
     void setDevice(string device);
+
+    /**
+     * @brief      Gets the device identity.
+     * @details    Sends a CyclopsAPI ``identify`` packet, waits 3 seconds for a
+     *             reply. Opens a pop-up to ask what kind of device is
+     *             connected, in case the device _could not be identified_.
+     *
+     * @return     ``true`` if identity can be verified.
+     */
     bool getDeviceIdentity();
-    /** Setter, that allows you to set the baudrate that will be used during acquisition */
+    
+    /**
+     * @brief      Sets the baudrate that will be used during acquisition. Calls
+     *             ``setDevice``.
+     *
+     * @param[in]  baudrate  The baudrate
+     * @sa         CyclopsCanvas::setDevice
+     */
     void setBaudrate(int baudrate);
 
+    /**
+     * @brief      Gets the serial information.
+     * @details    Exposes the private data as a constant struct.
+     * @return     The serial information.
+     */
     const cl_serial* getSerialInfo();
 
     void addListener(Listener* newListener);
@@ -177,7 +210,35 @@ public:
      */
     bool removeHook(int node_id);
 
+    /**
+     * @brief      Gets all hook-summaries and their info and places them in the
+     *             provided containers.
+     * @details    This is called just before code-generation, to
+     *             find out which "hooks" are *primed* and if they are, what is
+     *             their config.
+     *
+     * @param      hookInfoList  The hook-information list
+     * @param      summaries     The list of corresponding summary bitsets
+     */
     void getAllSummaries(std::vector<code::CyclopsHookConfig>& hookInfoList, Array<std::bitset<CLSTIM_NUM_PARAMS> >& summaries);
+    
+    /**
+     * @brief      Gets the summary for a "hook" -- the options that have been
+     *             configured by the user.
+     * @attention  This is only called by CyclopsEditor::isReadyForLaunch,
+     *             there's _another_ *static function* with same name!
+     *
+     * @param[in]  node_id   The CyclopsEditor Identifier
+     * @param      isPrimed  Indicates if the hook is _completely primed
+     *                       (configured)_, and ready to produce code
+     *
+     * @return     Returns ``true`` if we should start producing code for this
+     *             canvas. Note that all "hooks" need to be verified by the
+     *             ``ProcessorGraph::enableProcessors()``, to generate code. The
+     *             actual summary is indicated by ``isPrimed``.
+     * 
+     * @sa         CyclopsEditor::isReadyForLaunch
+     */
     bool getSummary(int node_id, bool& isPrimed);
 
     /**
@@ -218,13 +279,29 @@ public:
      */
     bool flashDevice(int& flashError);
 
+    /**
+     * @brief      Removes an existing link from the "hook" to _the_ LED channel.
+     *
+     * @param[in]  ledChannel  The led channel
+     */
     void removeLink(int ledChannel);
+
+    /**
+     * @brief      Hides the (existing) link from the "hook" to _the_ LED channel.
+     *
+     * @param[in]  ledChannel  The led channel
+     */
     void hideLink(int ledChannel);
+
+    /**
+     * @brief      Helper that redraws all links to the LED channels.
+     */
     void redrawLinks();
 
     void broadcastButtonState(CanvasEvent whichButton, bool state);
     void broadcastEditorInteractivity(CanvasEvent interactivity);
-    void unicastPluginIndicator(CanvasEvent pluginState, int node_id);
+    void broadcastIndicatorLED(int LEDtype, CanvasEvent event, int attribute=0);
+    void unicastPluginSelected(CanvasEvent pluginState, int node_id);
     void unicastUpdatePluginInfo(int node_id);
     bool unicastGetChannelMapStatus(int node_id);
     int  getNumListeners();
@@ -237,6 +314,7 @@ public:
 
     static void broadcastNewCanvas();
     static int getNumCanvas();
+
     /**
      * @brief      Gets the editor identifiers.
      *
@@ -244,13 +322,68 @@ public:
      * @param      editorIdList  The editor identifier list
      */
     static void getEditorIds(CyclopsCanvas* cc, Array<int>& editorIdList);
+
+    /**
+     * @brief      Gets the hook view, searching for it by the CyclopsEditor ID.
+     *
+     * @param[in]  node_id  The CyclopsEditor (node)node identifier
+     *
+     * @return     The hook view.
+     */
     static HookView* getHookView(int node_id);
+
+    /**
+     * @brief      Disconnects ``closingCanvas`` from the CyclopsEditor with ID
+     *             = ``node_id``
+     *
+     * @param      closingCanvas  The (pointer to) closing canvas
+     * @param[in]  node_id        The CYclopsEditor (node) identifier
+     */
     static void dropEditor(CyclopsCanvas* closingCanvas, int node_id);
+    
+    /**
+     * @brief      Migrates the CyclopsEditor (identified by the ``listener``)
+     *             from ``src`` canvas to ``dest``.
+     *
+     * @param      dest        The destination
+     * @param      src         The source
+     * @param      listener    The listener, identifies the CyclopsEditor.
+     * @param[in]  refreshNow  whether to refresh the UI elements _ASAP_ or not.
+     *
+     * @return     ``0`` always.
+     * @todo       Handle errors here. Convert ``jasserts`` to actual error checks.
+     */
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, CyclopsCanvas::Listener* listener, bool refreshNow=true);
+    
+    /**
+     * @brief      Migrates the CyclopsEditor (identified by the ``listener``)
+     *             from ``src`` canvas to ``dest``.
+     * @details    Does not flush the UI elements _ASAP_, allowing you to
+     *             migrate many, and then refresh just once.
+     *
+     * @param      dest    The destination
+     * @param      src     The source
+     * @param[in]  nodeId  The CyclopsEditor (node) identifier that needs to be
+     *                     transferred.
+     *
+     * @return     { description_of_the_return_value }
+     */
     static int migrateEditor(CyclopsCanvas* dest, CyclopsCanvas* src, int nodeId);
     
+    /**
+     * Provides access to Cyclops Sub Plugins.
+     */
     static ScopedPointer<CyclopsPluginManager> pluginManager;
+
+    /**
+     * _Owns_ all CyclopsCanvas instances, allows canvases to communicate.
+     */
     static OwnedArray<CyclopsCanvas> canvasList;
+
+    /**
+     * Hooks are not owned by the canvases in which they exist -- they are just
+     * connected to the canvases. This greatly smplifies migration.
+     */
     static OwnedArray<HookView> hookViews;
 
     /** This is used for VisualizerEditor, don't try to use this variable,
@@ -279,14 +412,26 @@ public:
     /** Contains information about the Cyclops device which was found on the
     selected serial port. */
     ScopedPointer<CyclopsDeviceInfo> CLDevInfo;
+    /**
+     * This is set to ``true`` if the device on the selected serial port is
+     * sucessfully "identified". Set to ``flase`` otherwise.
+     * @sa CyclopsCanvas::setDevice CyclopsCanvas::flashDevice CyclopsCanvas::buttonClicked
+     */
     bool serialIsVerified;
     
     ScopedPointer<LEDChannelPort> ledChannelPort;
+    /**
+     * @brief      Shows the progress of a long operation.
+     * @todo       Currently used only during "TEST", expand it's use.
+     */
     ScopedPointer<ProgressBar> progressBar;
     // Some state vars for "TEST" UI
     double progress, pstep;
     bool in_a_test;
-    // LED links
+    
+    /**
+     * Owns the links graphic that connects "hooks" to LED Channels.
+     */
     OwnedArray<Path> linkPaths;
     
     ScopedPointer<code::CyclopsProgram> program;
@@ -295,11 +440,16 @@ public:
 private:
     
     // GUI stuff
-    ScopedPointer<IndicatorLED>  devStatus;
-    ScopedPointer<UtilityButton> refreshButton; /**< Button that reloads device
-    list */
-    ScopedPointer<ComboBox> portCombo;          /**< List of all available dvices */
-    ScopedPointer<ComboBox> baudrateCombo;      /**< List of all available baudrates. */
+    /** Button that reloads device list
+     */
+    ScopedPointer<UtilityButton> refreshButton;
+    /** List of all available dvices 
+     */
+    ScopedPointer<ComboBox> portCombo;
+
+    /** List of all available baudrates.
+     */
+    ScopedPointer<ComboBox> baudrateCombo;
 
     ScopedPointer<Label> hookLabel;
     ScopedPointer<HookViewDisplay> hookViewDisplay;
@@ -309,17 +459,25 @@ private:
     ScopedPointer<SignalDisplay> signalDisplay;
     ScopedPointer<SignalViewport> signalViewport;
 
-    ScopedPointer<UtilityButton> closeButton;   /**< Used to close a canvas */    
+    /**< Used to close a canvas 
+     */
+    ScopedPointer<UtilityButton> closeButton;    
 
-    // listeners
+    /** Listeners of events on the Canvas, includes all the CyclopsEditors that
+     *  are _connected_ to this canvas.
+     */
     ListenerList<Listener> canvasEventListeners;
 
     static const int BAUDRATES[12];
-    /** Just used to provide a unique ``CyclopsCanvas::realIndex`` */
+    
+    /** Just used to provide a unique ``CyclopsCanvas::realIndex``
+     */
     static int numCanvases;
 
     /**
      * @brief      Filters only relevant serial ports (by name).
+     *
+     * @param[in]  portName  The port name
      *
      * @return     ``true`` if a Teensy or Arduino could be connected.
      */
@@ -346,6 +504,15 @@ private:
      */
     void updateLink(int ledChannel, Point<int> src, Point<int> dest);
     
+    /**
+     * @brief      Gets the summary of the "hook", *as well as* the "HookInfo"
+     *             identified by the CyclopsEditor (node) Identifier.
+     *
+     * @param[in]  node_id  The CyclopsEditor (node) identifier
+     * @param      summary  The summary (is placed in this container)
+     *
+     * @return     The HookInfo contents.
+     */
     HookInfo* getSummary(int node_id, std::bitset<CLSTIM_NUM_PARAMS>& summary);
 
     static CyclopsCanvas::Listener* findListenerById(CyclopsCanvas* cc, int nodeId);
@@ -354,36 +521,11 @@ private:
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class IndicatorLED : public Component
-                   , public SettableTooltipClient
-{
-public:
-    IndicatorLED (const Colour& fill, const Colour& line);
-    void paint (Graphics& g);
-    void update (const Colour& fill, String tooltip);
-    void update (const Colour& fill, const Colour& line, String tooltip);
-private:
-    Colour fillColour, lineColour;
-};
-
-
+/*
+  +###########################################################################+
+  ||                             LED CHANNEL PORT                            ||
+  +###########################################################################+
+*/
 class LEDChannelPort : public Component
                      , public DragAndDropTarget
                      , public Timer
@@ -418,23 +560,11 @@ private:
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                              HOOK VIEW PORT                             ||
+  +###########################################################################+
+*/
 
 class HookViewport : public Viewport
 {
@@ -447,11 +577,11 @@ private:
     HookViewDisplay* hvDisplay;
 };
 
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                             HOOK VIEW DISPLAY                           ||
+  +###########################################################################+
+*/
 class HookViewDisplay : public Component
 {
 public:
@@ -469,15 +599,11 @@ public:
     int height;
 };
 
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                                HOOK INFO                                ||
+  +###########################################################################+
+*/
 
 class HookInfo{
 public:
@@ -487,6 +613,11 @@ public:
     HookInfo(int node_id);
 };
 
+/*
+  +###########################################################################+
+  ||                             HOOK CONNECTOR                              ||
+  +###########################################################################+
+*/
 
 class HookConnector : public Component
 {
@@ -502,10 +633,11 @@ private:
     HookView*      hookView;
 };
 
-
-
-
-
+/*
+  +###########################################################################+
+  ||                                 HOOK VIEW                               ||
+  +###########################################################################+
+*/
 class HookView : public Component
                , public ComboBox::Listener
                , public DragAndDropTarget
@@ -554,14 +686,11 @@ private:
 };
 
 
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                               SIGNAL BUTTON                             ||
+  +###########################################################################+
+*/
 
 class SignalButton : public ShapeButton
 {
@@ -582,8 +711,11 @@ private:
     SignalView* parentView;
 };
 
-
-
+/*
+  +###########################################################################+
+  ||                                SIGNAL VIEW                              ||
+  +###########################################################################+
+*/
 class SignalView : public Component
                  , public Button::Listener
 {
@@ -638,7 +770,11 @@ private:
     }
 };
 
-
+/*
+  +###########################################################################+
+  ||                                SIGNAL VIEWPORT                          ||
+  +###########################################################################+
+*/
 
 class SignalViewport : public Viewport
 {
@@ -649,17 +785,11 @@ private:
     SignalDisplay* signalDisplay;
 };
 
-
-
-
-
-
-
-
-
-
-
-
+/*
+  +###########################################################################+
+  ||                             MIGRATE COMPONENT                           ||
+  +###########################################################################+
+*/
 
 class MigrateComponent : public Component
                        , public Button::Listener
