@@ -131,10 +131,6 @@
 #include <fstream>
 #include "yaml-cpp/yaml.h"
 
-/**
- * @defgroup ns-cyclops cyclops
- * 
- */
 namespace cyclops
 {
 
@@ -251,12 +247,14 @@ enum returnCode
 };
 
 /**
- * @defgroup cyclops-api
- * 
- * @warning
- * Most functions in this namespace assume that the various arguments are going to be valid, ie
- * there is absolutely no error checking. In the worst case, malformed packets might invoke
- * undesired action on the Teensy!
+ * @brief      CyclopsAPI wraps low-level byte operations that form and
+ *             decode RPC packets for the Cyclops Device.
+ * @defgroup   ns-cyclops-api cyclops-api
+ * @ingroup    ns-cyclops
+ * @warning    Most functions in this namespace assume that the various
+ *             arguments are going to be valid, ie there is absolutely no error
+ *             checking. In the worst case, malformed packets might invoke
+ *             undesired action on the Teensy!
  */
 namespace api{
 
@@ -275,21 +273,21 @@ struct CyclopsRPC
 /**
  * @brief      Start (aka reset) the selected Channel Signals.
  * @note       Invoke during ``ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool start (CyclopsRPC *rpc, const int *channels, int channelCount);
 
 /**
  * @brief      Pause (aka FREEZE) the selected Channel Signals.
  * @note       Invoke during ``ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool stop (CyclopsRPC *rpc, const int *channels, int channelCount);
 
 /**
  * @brief      Reset (aka start) the selected Channel Signals.
  * @note       Invoke during ``ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool reset (CyclopsRPC *rpc, const int *channels, int channelCount);
 
@@ -297,28 +295,28 @@ bool reset (CyclopsRPC *rpc, const int *channels, int channelCount);
  * @brief      Swap the physical cyclops channel of the two selected Channel
  *             Signals.
  * @note       Invoke during ``ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool swap (CyclopsRPC *rpc, int c1, int c2);
 
 /**
  * @brief      Launches the experiment on the teensy.
  * @note       Invoke during ``not ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool launch (CyclopsRPC *rpc);
 
 /**
  * @brief      Ends the experiment on the teensy, which can be relaunched.
  * @note       Invoke during ``ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool end (CyclopsRPC *rpc);
 
 /**
  * @brief      Tests the given channel LED, by driving a TEST Signal on th LED.
  * @note       Invoke during ``not ExperimentActive``
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool test(CyclopsRPC *rpc, int channel);
 
@@ -328,7 +326,7 @@ bool test(CyclopsRPC *rpc, int channel);
  * @note       Invoke during ``not ExperimentActive``, ``ExperimentActive``
  * @attention  This should not be invoked when aquisition is active (the teensy can
  *             handle it, but the GUI cannot).
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool identify (CyclopsRPC *rpc);
 
@@ -341,14 +339,14 @@ bool identify (CyclopsRPC *rpc);
 
 /**
  * @brief      Change the ``source`` object for the selected channel, in LOOPBACK mode.
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  * @param[in]  srcID    The source identifier on the teensy.
  */
 bool change_source_loop (CyclopsRPC *rpc, int channel, int srcID);
 
 /**
  * @brief      Change the ``source`` object for the selected channel, in ONE_SHOT mode.
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  * @param[in]  srcID    The source identifier on the teensy.
  */
 bool change_source_one_shot (CyclopsRPC *rpc, int channel, int srcID);
@@ -356,7 +354,7 @@ bool change_source_one_shot (CyclopsRPC *rpc, int channel, int srcID);
 /**
  * @brief      Change the ``source`` object for the selected channel, in N_SHOT
  *             mode.
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  * @param[in]  srcID       The source identifier on the teensy.
  * @param[in]  shot_cycle  The shot cycle (1 by default)
  */
@@ -366,54 +364,54 @@ bool change_source_n_shot (CyclopsRPC *rpc, int channel, int srcID, int shot_cyc
  * @brief      Set a new period of update for ``generatedSource``.
  * @note       Works only if the active source on the selected channel is of type ``generatedSource``
  *             AND was been configured with a ``const`` holdTime.
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool change_time_period (CyclopsRPC *rpc, int channel, uint32_t new_period);
 
 /**
  * @brief      Set the time-scale factor for the source on the selected channel.
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool time_factor (CyclopsRPC *rpc, int channel, float tFactor);
 
 /**
  * @brief      Set the voltage-scale factor for the source on the selected channel.
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool voltage_factor (CyclopsRPC *rpc, int channel, float vFactor);
 
 /**
  * @brief      Set the DC voltage offset for the source on the selected channel.
  * @note       This number is a signed integer!
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool voltage_offset (CyclopsRPC *rpc, int channel, int16_t vOffset);
 
 /**
  * @brief      Set the "ON" time for the square wave.
  * @note       Works only if the active source on the selected channel is of type ``squareSource``!
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool square_on_time (CyclopsRPC *rpc, int channel, uint32_t onTime);
 
 /**
  * @brief      Set the "OFF" time for the square wave.
  * @note       Works only if the active source on the selected channel is of type ``squareSource``!
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool square_off_time (CyclopsRPC *rpc, int channel, uint32_t offTime);
 
 /**
  * @brief      Set the "ON" voltage level for the square wave.
  * @note       Works only if the active source on the selected channel is of type ``squareSource``!
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool square_on_level (CyclopsRPC *rpc, int channel, uint16_t onLevel);
 
 /**
  * @brief      Set the "OFF" voltage level for the square wave.
  * @note       Works only if the active source on the selected channel is of type ``squareSource``!
- * @ingroup    cyclops-api
+ * @ingroup    ns-cyclops-api
  */
 bool square_off_level (CyclopsRPC *rpc, int channel, uint16_t offLevel);
 

@@ -26,55 +26,18 @@
 
 #include <VisualizerWindowHeaders.h>
 #include <VisualizerEditorHeaders.h>
-#include <EditorHeaders.h>
-#include <SerialLib.h>
-#include <string>
-#include <vector>
-#include <bitset>
-#include <map>
-#include <algorithm>
 
+#include "CyclopsCanvasUtils.h"
 #include "plugin_manager/CLPluginManager.h"
 #include "code_gen/Programs.h"
 
+/**
+ * @brief      Module to interface with and control the Cyclops LED Driver for
+ *             automated Optogenetic (feedback) experiments.
+ * @defgroup   ns-cyclops cyclops
+ */
 namespace cyclops {
-    namespace CyclopsColours{
-    const Colour disconnected(0xffff3823);
-    const Colour notVerified(0xff3d64ff);
-    const Colour connected(0xffc1d045);
-    const Colour errorGenFlash(0xffff7400);
-    const Colour notReady       = disconnected;
-    const Colour Ready          = connected;
-    const Colour pluginSelected = notVerified;
-    }
 
-enum class CanvasEvent{
-    WINDOW_BUTTON,
-    TAB_BUTTON,
-    COMBO_BUTTON,
-    SERIAL,
-    PLUGIN_SELECTED,
-    CODE_GEN,
-    BUILD,
-    FLASH,
-    TRANSFER_DROP,
-    FREEZE,
-    THAW,
-};
-
-struct cl_serial
-{
-    std::string portName;
-    ScopedPointer<ofSerial> Serial;
-    int baudRate;
-
-    cl_serial()
-    {
-        portName = "";
-        Serial = new ofSerial();
-        baudRate = -1;
-    }
-};
 class CyclopsProgram;
 
 class IndicatorLED;
@@ -337,7 +300,7 @@ public:
      *             = ``node_id``
      *
      * @param      closingCanvas  The (pointer to) closing canvas
-     * @param[in]  node_id        The CYclopsEditor (node) identifier
+     * @param[in]  node_id        The CyclopsEditor (node) identifier
      */
     static void dropEditor(CyclopsCanvas* closingCanvas, int node_id);
     
@@ -430,7 +393,7 @@ public:
     bool in_a_test;
     
     /**
-     * Owns the links graphic that connects "hooks" to LED Channels.
+     * Owns the links graphic that connects "hooks" to LED %Channels.
      */
     OwnedArray<Path> linkPaths;
     
@@ -526,6 +489,13 @@ private:
   ||                             LED CHANNEL PORT                            ||
   +###########################################################################+
 */
+/**
+ * @brief      Holds the LED %Channel UI elements:
+ *             * Test Buttons
+ *             * LED link buttons
+ * @details    Allows user to route any sub-plugin's output to any channel on
+ *             the cyclops device.
+ */
 class LEDChannelPort : public Component
                      , public DragAndDropTarget
                      , public Timer
@@ -547,15 +517,15 @@ public:
     bool shouldDrawDragImageWhenOver();
 
     CyclopsCanvas* canvas;
-    OwnedArray<UtilityButton> testButtons; /**< TEST Buttons */
+    OwnedArray<UtilityButton> testButtons; /**< TEST Buttons @todo Change the disabled state colour. */
     OwnedArray<ImageButton> LEDButtons;
-    Array<int> connections; // <led-channel> -> <nodeId>
+    Array<int> connections; /**< Maps led-channel to nodeID */
 private:
     int getIndexfromXY(const Point<int>& pos);
     void addConnection(Component*);
 
     Array<var>* dragDescription;
-    int mouseOverIndex;
+    int mouseOverIndex; /**< The LED channel which is under the mouse. */
     bool isDragging, dragShouldDraw;
 };
 
@@ -565,7 +535,10 @@ private:
   ||                              HOOK VIEW PORT                             ||
   +###########################################################################+
 */
-
+/**
+ * @brief      Holds the HookView objects in a scrollable port in a
+ *             HookViewDisplay component.
+ */
 class HookViewport : public Viewport
 {
 public:
@@ -574,7 +547,7 @@ public:
     void visibleAreaChanged(const Rectangle<int>& newVisibleArea);
     void paint(Graphics& g);
 private:
-    HookViewDisplay* hvDisplay;
+    HookViewDisplay* hvDisplay; /**< This component is displayed in side the Viewport. */
 };
 
 /*
@@ -582,6 +555,16 @@ private:
   ||                             HOOK VIEW DISPLAY                           ||
   +###########################################################################+
 */
+/**
+ * @brief      This component just displays HookView Components, without owning
+ *             them.
+ * @details    The HookViews are statically owned by (all) CyclopsCanvases. This
+ *             makes it super-easy to migrate them from one display to another.
+ *             
+ *             It keeps track of the "displayed" HookViews using just an integer
+ *             array: ``shownIDs``.  
+ *             _Care is taken to ensure a HookView is displayed in only one display!_
+ */
 class HookViewDisplay : public Component
 {
 public:
@@ -594,7 +577,7 @@ public:
     void disableAllInputWidgets();
     void enableAllInputWidgets();
 
-    Array<int> shownIds;
+    Array<int> shownIds; /**< Keeps track of the HookViews currently displayed by the display. */
     CyclopsCanvas* canvas;
     int height;
 };
@@ -604,11 +587,25 @@ public:
   ||                                HOOK INFO                                ||
   +###########################################################################+
 */
-
+/**
+ * @brief      The actual data that all GUI elements are displaying/obtaining
+ *             from user eventually comes to the HookInfo.
+ */
 class HookInfo{
 public:
-    int nodeId, LEDChannel;
-    CyclopsPluginInfo* pluginInfo;
+    int nodeId, /**< The CyclopsEditor (node) Identifier. */
+        LEDChannel; /**< The LED %Channel that this sub-plugin controls. */
+    CyclopsPluginInfo* pluginInfo; /**< Provided from CyclopsPluginManager */
+    /**
+     * The program reads a list of CyclopsSignals from the computer
+     * (signals.yaml), into the CyclopsSignals::signals list.
+     * 
+     * As the user _chooses_ the kᵗʰ signal from CyclopsSignals::signals and 
+     * drops it in the mᵗʰ position of the HookView,
+     * ```
+     * selectedSignals[m] = k;
+     * ```
+     */
     std::vector<int> selectedSignals;
     HookInfo(int node_id);
 };
@@ -618,7 +615,10 @@ public:
   ||                             HOOK CONNECTOR                              ||
   +###########################################################################+
 */
-
+/**
+ * @brief      The draggable wire-reel which is used to connect a HookView to an
+ *             LED %Channel.
+ */
 class HookConnector : public Component
 {
 public:
@@ -638,6 +638,15 @@ private:
   ||                                 HOOK VIEW                               ||
   +###########################################################################+
 */
+/**
+ * @brief      The HookView bridges CyclopsSignals and the CyclopsPluginManager and
+ *             allows the user to configure all aspects of the sub-plugin.
+ * @details    Feature list:
+ *             * Update CyclopsEditor LED indicators when a plugin is selected.
+ *             * Allow user to drop a compatible signal into signal slots.
+ *             * Connect hook to an LED channel.
+ * @sa         CyclopsSignal, CyclopsPluginManager
+ */
 class HookView : public Component
                , public ComboBox::Listener
                , public DragAndDropTarget
@@ -645,18 +654,56 @@ class HookView : public Component
 {
 public:
     int nodeId;
+    /**
+     * To display the Cyclops Editor (node) Identifier.
+     */
     ScopedPointer<Label> hookIdLabel;
+    /**
+     * Dropdown to choose a sub-plugin. Poulated by the CyclopsPluginManager.
+     */
     ScopedPointer<ComboBox> pluginSelect;
+    /**
+     * Holds all configuration info of this sub-plugin.
+     */
     ScopedPointer<HookInfo> hookInfo;
+    /**
+     * The draggable wire-reel, to connect HookView and LED %Channel.
+     */
     ScopedPointer<HookConnector> hookConnector;
     OwnedArray<Label> codeLabels;
     OwnedArray<Label> signalLabels;
 
+    /**
+     * @brief      { function_description }
+     *
+     * @param[in]  node_id  The node identifier
+     */
     HookView(int node_id);
+    /**
+     * @brief      Catches the "setting" of a sub-plugin to update the LED
+     *             Indicator on the Hook.
+     *
+     * @param      cb    The ComboBox that was manipualted.
+     */
     void comboBoxChanged(ComboBox* cb);
     void refresh();
     void paint(Graphics& g);
     void resized();
+    /**
+     * @brief      Makes a "summary" of the configuration of this Hook.
+     * @details    This is used to verify if the user has completely configured
+     *             the Hook or not. The user needs to perform 3 actions:
+     *             1. Choose all input event channels on the CyclopsEditor.
+     *             2. Select the (all) "Signals" (ie drag-n-drop them).
+     *             3. Connect the HookView to an LED %Channel.
+     *
+     *             ``makeSummary`` checks if (2) and (3) are done, and sets
+     *             accordingly, the 1ˢᵗ or the 2ⁿᵈ bit in the ``bitset``.
+     *             The 3ʳᵈ bit is set by CyclopsEditor::channelMapStatus.
+     * @sa         CyclopsEditor::channelMapStatus
+     *
+     * @param      summary  This ``bitset`` is _filled_.
+     */
     void makeSummary(std::bitset<CLSTIM_NUM_PARAMS>& summary);
 
     void timerCallback();
@@ -676,7 +723,7 @@ private:
          isDragging,
          offset;
     Array<var>* dragDescription;
-    Path signalRect;
+    Path signalRect; // A dashed rectangle appears while dragging.
     ScopedPointer<PathStrokeType> signalRectStroke;
 
     void prepareForDrag(int offset = 0);
@@ -691,7 +738,12 @@ private:
   ||                               SIGNAL BUTTON                             ||
   +###########################################################################+
 */
-
+/**
+ * @brief      Each SignalButton represents a Signal that was read from the
+ *             ``signals.yaml`` file.
+ * @details    Clicking the button will display/present information/graph of the
+ *             Signal.
+ */
 class SignalButton : public ShapeButton
 {
 public:
@@ -716,12 +768,24 @@ private:
   ||                                SIGNAL VIEW                              ||
   +###########################################################################+
 */
+/**
+ * @brief      Each SignalView is basically just a SignalButton.
+ * @details    More UI elements will be added to SignalView, like SignalGraph,
+ *             edit buttons, etc.
+ */
 class SignalView : public Component
                  , public Button::Listener
 {
 public:
-    ScopedPointer<SignalButton> signalButton;
+    ScopedPointer<SignalButton> signalButton; /**< The button. */
     int signalIndex;
+    /**
+     * @brief      Just creates and places the SignalButton.
+     *
+     * @param[in]  index   The index of the SignalButton in
+     *                     CyclopsSignal::signals.
+     * @param      parent  The parent SignalDisplay component.
+     */
     SignalView(int index, SignalDisplay *parent);
     /**
      * @brief      Called when mouse drags the SignalView (which is slightly
@@ -739,18 +803,39 @@ private:
     SignalDisplay *parentDisplay;
 };
 
+/*
+  +###########################################################################+
+  ||                              SIGNAL DISPLAY                             ||
+  +###########################################################################+
+*/
+/**
+ * @brief      Holds the list of SignalViews.
+ */
 class SignalDisplay : public Component
 {
 public:
+    /**
+     * @brief      Constructs the CyclopsSignals::signals by reading
+     *             ``signals.yaml``, and invoking CyclopsSignal::readSignals.
+     *
+     * @param      cc    The parent CyclopsCanvas.
+     */
     SignalDisplay(CyclopsCanvas *cc);
+    /**
+     * @brief      Helper function that pretty prints the CyclopsSignal
+     *             information.
+     *
+     * @param[in]  index  The index of the CyclopsSignal in the
+     *                    CyclopsSignal::signals list.
+     */
     void showDetails(int index);
     void resized();
     void paint(Graphics& g);
     void dragging(SignalButton* sb);
     void dragDone(SignalButton* sb);
 
-    OwnedArray<SignalView> signalViews;
-    CyclopsCanvas *canvas;
+    OwnedArray<SignalView> signalViews; /**< Holds all the SignalViews. */
+    CyclopsCanvas *canvas; /** < The parent Canvas. */
 private:
     bool isDragging;
     static inline File getSignalsFile(const String& pathFromExeDir) {
@@ -775,10 +860,17 @@ private:
   ||                                SIGNAL VIEWPORT                          ||
   +###########################################################################+
 */
-
+/**
+ * @brief      Just makes the SignalDisplay scrollable.
+ */
 class SignalViewport : public Viewport
 {
 public:
+    /**
+     * @brief      Constructor.
+     * @details    Turns on vertical scrollbar by default.
+     * @param      sd    The SignalDisplay that is to be displayed.
+     */
     SignalViewport(SignalDisplay* sd);
     void paint(Graphics& g);
 private:
@@ -790,7 +882,11 @@ private:
   ||                             MIGRATE COMPONENT                           ||
   +###########################################################################+
 */
-
+/**
+ * @brief      Migrate Component shows itself in a AlertWindow, when a Canvas is
+ *             closed by the user, to help him/her _migrate_ or _drop_ the
+ *             HookViews in the canvas.
+ */
 class MigrateComponent : public Component
                        , public Button::Listener
                        , public ComboBox::Listener
@@ -798,6 +894,18 @@ class MigrateComponent : public Component
 public:
     MigrateComponent(CyclopsCanvas* closing_canvas);
     void resized();
+    /**
+     * @brief      Responds to any Button press on the AlertWindow.
+     * @details    When "DONE" is pressed,
+     *             - Destroy all HookViews which are to be dropped.
+     *             - _Move_ to-be-migrated HookViews to the destination Canvas,
+     *               by just manipulating ``HookViewDisplay::shownIDs``.
+     *             - Refresh both Canvas.
+     *             - Destroy source Canvas.
+     *             
+     * @sa         HookViewDisplay
+     * @param      button  The button which was pressed.
+     */
     void buttonClicked(Button* button);
     void comboBoxChanged(ComboBox* cb);
 
