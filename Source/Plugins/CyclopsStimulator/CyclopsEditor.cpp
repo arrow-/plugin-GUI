@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace cyclops {
 
+Path CyclopsEditor::triangle = Path();
+
 CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors)
     : VisualizerEditor   (parentNode, 240, useDefaultParameterEditors)
     //, progress(0, 1.0, 1000)
@@ -49,26 +51,29 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     connectedCanvas->addListener(this);
     connectedCanvas->addHook(nodeId);
 
-    // add GUI elements
-    myID = new Label("my_id", String(nodeId));
-    myID->setFont(Font("Default", 12, Font::plain));
-    myID->setColour(Label::textColourId, Colours::black);
-    myID->setBounds(3, 27, 60, 10);
-    addAndMakeVisible(myID);
-    
+    // add GUI elements    
     canvasCombo = new ComboBox();
     canvasCombo->addListener(this);
     canvasCombo->setTooltip("Select the Cyclops Board which would own this \"hook\".");
     prepareCanvasComboList(canvasCombo);
     canvasCombo->setSelectedId(1, dontSendNotification);
-    canvasCombo->setBounds((240-85)*5/6, 30+5, 90, 25);
+    canvasCombo->setBounds(142, 25, 90, 25);
     addAndMakeVisible(canvasCombo);
 
     comboText = new Label("combo label", "Select Device:");
-    comboText->setBounds(3,27+5,200,30);
+    comboText->setBounds(17, 22, 200, 30);
     comboText->setFont(Font("Default", 16, Font::plain));
     comboText->setColour(Label::textColourId, Colours::black);
     addAndMakeVisible(comboText);
+
+    cmapViewport = new Viewport();
+    cmapViewport->setBounds(15, 52, 210, 75);
+    cmapViewport->setScrollBarsShown(true, false);
+    cmapViewport->setScrollBarThickness(8);
+
+    addChildComponent(cmapViewport);
+    channelMapper = new ChannelMapperDisplay(this, connectedCanvas);
+    cmapViewport->setViewedComponent(channelMapper, false);
 
     // Add LEDs
     serialLED->setBounds(169, 6, 12, 12);
@@ -260,6 +265,37 @@ void CyclopsEditor::timerCallback()
 void CyclopsEditor::paint(Graphics& g)
 {
     GenericEditor::paint(g);
+    if (getCollapsedState() == false){
+        Font old = g.getCurrentFont();
+        g.setFont(Font(12, Font::FontStyleFlags::bold));
+        g.setColour(Colours::white);
+        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 3, 47));
+        g.fillRoundedRectangle(3, 47, 22, 16, 3.5);
+        g.setColour(Colours::black);
+        g.drawText (String(nodeId), 5, 49, 20, 12, Justification::left, false);
+        g.addTransform(AffineTransform::rotation(M_PI/2.0, 3, 47));
+        g.setFont(old);
+    }
+    if (cmapViewport->isVisible()){
+        if (channelMapper->channelMap.size() > 3){
+            if (CyclopsEditor::triangle.isEmpty()){
+                CyclopsEditor::triangle.addTriangle(155, 80, 160, 85, 165, 80);
+            }
+            g.setColour(Colours::white);
+            g.fillPath(CyclopsEditor::triangle);
+        }
+        g.setColour(Colours::black);
+        Font old = g.getCurrentFont();
+        g.setFont(10);
+        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 3, 100));
+        g.drawText ("OE-GUI", 3, 100, 80, 12, Justification::left, false);
+        g.addTransform(AffineTransform::rotation(M_PI/2.0, 3, 100));
+        
+        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 225, 100));
+        g.drawText ("plugin", 225, 100, 80, 12, Justification::left, false);
+        g.addTransform(AffineTransform::rotation(M_PI/2.0, 225, 100));
+        g.setFont(old);
+    }
 }
 
 void CyclopsEditor::disableAllInputWidgets()
@@ -393,6 +429,7 @@ void CyclopsEditor::updateReadinessIndicator(CanvasEvent event, int attribute=0)
             readinessLED->update(CyclopsColours::errorGenFlash, "Flashing failed!");
     }
     else if (event == CanvasEvent::PLUGIN_SELECTED){
+        // sub-plugin selected
         readinessLED->update(CyclopsColours::pluginSelected, "Plugin Selected, now configure it.");
     }
     readinessLED->repaint();
@@ -403,9 +440,16 @@ bool CyclopsEditor::channelMapStatus()
     return true;
 }
 
-CyclopsPluginInfo* CyclopsEditor::refreshPluginInfo()
+CyclopsPluginInfo* CyclopsEditor::getPluginInfo()
 {
     return connectedCanvas->getPluginInfoById(nodeId);
+}
+
+void CyclopsEditor::refreshPluginInfo()
+{
+    channelMapper->update(getPluginInfo());
+    cmapViewport->setVisible(true);
+
 }
 
 void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
@@ -547,5 +591,61 @@ void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip
     lineColour = line;
     setTooltip(tooltip);
 }
+
+
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                         CHANNEL-MAPPER-DISPLAY                           |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
+ChannelMapperDisplay::ChannelMapperDisplay(CyclopsEditor* editor, CyclopsCanvas* canvas):
+    editor(editor),
+    canvas(canvas)
+{}
+
+void ChannelMapperDisplay::update(CyclopsPluginInfo* pluginInfo)
+{
+    int delta = pluginInfo->channelCount - selectors.size();
+    if (delta < 0){
+        selectors.removeLast(delta);
+        channelMap.removeLast(delta);
+    }
+    else if (delta > 0){
+        for (int i=0; i<delta; i++){
+            Slider* s = new Slider();
+            s->setSliderStyle(Slider::SliderStyle::LinearHorizontal);
+            s->setTextBoxStyle(Slider::TextEntryBoxPosition::TextBoxLeft, false, 24, 18);
+            s->setVelocityBasedMode(true);
+            s->setVelocityModeParameters();
+            //s->setIncDecButtonsMode(IncDecButtonMode::incDecButtonsDraggable_AutoDirection);
+            s->setChangeNotificationOnlyOnRelease(true);
+            s->addListener(this);
+            s->setBounds(0, i*(20+5)+5, 180, 20);
+            addAndMakeVisible(s);
+            selectors.add(s);
+            channelMap.add(-1);
+        }
+    }
+    for (int i=0; i<pluginInfo->channelCount; i++){
+        selectors[i]->setValue(-1);
+        selectors[i]->setRange(0, editor->getProcessor()->getNumInputs(), 1.0);
+        channelMap.set(i, -1);
+    }
+    setBounds(0, 0, 210, 25*selectors.size());
+    editor->repaint();
+}
+
+void ChannelMapperDisplay::paint(Graphics& g){
+    for (int i=0; i<selectors.size(); i++){
+        g.drawText(String(i), 180, i*(20+5)+5, 24, 20, Justification::Flags::left);
+    }
+}
+
+void ChannelMapperDisplay::sliderValueChanged(Slider* s)
+{
+    std::cout << s->getValue() << ":" << selectors.indexOf(s) << std::endl;
+}
+
+void ChannelMapperDisplay::sliderDragStarted(Slider* s) {}
+void ChannelMapperDisplay::sliderDragEnded(Slider* s) {}
 
 } // NAMESPACE cyclops

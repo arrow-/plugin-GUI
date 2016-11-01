@@ -39,7 +39,7 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     infoStruct.Name = "Example_CL_Plugin";
 
     // The no. of input data channels that will be monitored for events.
-    infoStruct.channelCount = 1;
+    infoStruct.channelCount = 10;
     // The no. of Signals needed on the Teensy, should be same as length of the
     // vector below.
     infoStruct.signalCount = 4;

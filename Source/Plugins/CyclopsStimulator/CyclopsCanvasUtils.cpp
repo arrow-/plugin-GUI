@@ -450,12 +450,13 @@ HookView::HookView(int node_id) : nodeId(node_id)
 void HookView::comboBoxChanged(ComboBox* cb)
 {
     HookViewDisplay* parent = getParentDisplay();
-    parent->canvas->unicastPluginSelected(CanvasEvent::PLUGIN_SELECTED, nodeId);
-    parent->canvas->unicastUpdatePluginInfo(nodeId);
     //DBG (cb->getSelectedItemIndex() << "\n");
     String name = cb->getItemText(cb->getSelectedItemIndex());
     hookInfo->pluginInfo = CyclopsCanvas::pluginManager->getInfo(name.toStdString());
-
+    if (hookInfo->pluginInfo != nullptr)
+        parent->canvas->unicastPluginSelected(CanvasEvent::PLUGIN_SELECTED, nodeId);
+    else
+        DBG ("*CL* Could not load sub-plugin!");
     // remove any selected Labels
     codeLabels.clear();
     signalLabels.clear();

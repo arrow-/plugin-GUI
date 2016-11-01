@@ -68,7 +68,7 @@ public:
     public:
         virtual void updateSerialIndicator(CanvasEvent event) = 0;
         virtual void updateReadinessIndicator(CanvasEvent event, int attribute=0) = 0;
-        virtual CyclopsPluginInfo* refreshPluginInfo() = 0;
+        virtual void refreshPluginInfo() = 0;
         virtual bool channelMapStatus() = 0;
         virtual void changeCanvas(CyclopsCanvas* dest) = 0;
         virtual void updateButtons(CanvasEvent whichButton, bool state) = 0;
@@ -265,7 +265,6 @@ public:
     void broadcastEditorInteractivity(CanvasEvent interactivity);
     void broadcastIndicatorLED(int LEDtype, CanvasEvent event, int attribute=0);
     void unicastPluginSelected(CanvasEvent pluginState, int node_id);
-    void unicastUpdatePluginInfo(int node_id);
     bool unicastGetChannelMapStatus(int node_id);
     int  getNumListeners();
 

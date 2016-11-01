@@ -746,12 +746,8 @@ void CyclopsCanvas::broadcastIndicatorLED(int LEDtype, CanvasEvent event, int at
 void CyclopsCanvas::unicastPluginSelected(CanvasEvent pluginState, int node_id)
 {
     CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
+    // also updates the channel mapper display
     listener->updateReadinessIndicator(CanvasEvent::PLUGIN_SELECTED);
-}
-
-void CyclopsCanvas::unicastUpdatePluginInfo(int node_id)
-{
-    CyclopsCanvas::Listener* listener = CyclopsCanvas::findListenerById(this, node_id);
     listener->refreshPluginInfo();
 }
 

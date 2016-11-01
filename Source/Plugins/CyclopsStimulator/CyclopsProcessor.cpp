@@ -75,7 +75,7 @@ bool CyclopsProcessor::isReady()
 
     cl_editor->isReadyForLaunch(isOrphan, isPrimed, genError, buildError, flashError);
     if (!isOrphan && isPrimed && cl_editor->isSerialConnected()){
-        pluginInfo = cl_editor->refreshPluginInfo();
+        pluginInfo = cl_editor->getPluginInfo();
         serialInfo = cl_editor->getSerial();
         plugin = pluginInfo->CyclopsPluginFactory();
 

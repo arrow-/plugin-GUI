@@ -37,6 +37,7 @@ namespace cyclops{
 class CyclopsProcessor;
 class CyclopsCanvas;
 class IndicatorLED;
+class ChannelMapperDisplay;
 
 /* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  * |                              CYCLOPS-EDITOR                              |
@@ -155,8 +156,21 @@ public:
      */
     void updateSerialIndicator(CanvasEvent event);
 
+    /**
+     * @brief      Gets the sub-plugin information from the Canvas.
+     *
+     * @return     The plugin information ``struct``.
+     */
+    CyclopsPluginInfo* getPluginInfo();
 
-    CyclopsPluginInfo* refreshPluginInfo();
+    /**
+     * @brief      Gets the sub-plugin information from the canvas and updates
+     *             (as well as *resets*) the ChannelMapper sliders.
+     * @details    Invoked automatically when a plugin is selected with the drop-down.
+     * @sa         CyclopsCanvas::unicastPluginSelected
+     */
+    void refreshPluginInfo();
+
     bool channelMapStatus();
     void changeCanvas(CyclopsCanvas* dest);
 
@@ -181,10 +195,13 @@ private:
     ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
     CyclopsProcessor* processor;         /**< Parent Processor node */
     ScopedPointer<Label> comboText;
-    ScopedPointer<Label> myID;           /**< The Processor ID provided by OE core */
+    ScopedPointer<ChannelMapperDisplay> channelMapper;
+    ScopedPointer<Viewport> cmapViewport;
 
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
+
+    static Path triangle;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsEditor);
 };
@@ -195,16 +212,59 @@ private:
  * |                              INDICATOR-LED                               |
  * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  */
+/**
+ * @brief      A small status Indicator on the CyclopsEditor, just colour and a
+ *             tootip.
+ * @details    IndicatorLED is stateless.
+ */
 class IndicatorLED : public Component
                    , public SettableTooltipClient
 {
 public:
     IndicatorLED (const Colour& fill, const Colour& line);
     void paint (Graphics& g);
+    /**
+     * @brief      Sets the colour and tooltip.
+     *
+     * @param[in]  fill     The fill colour.
+     * @param[in]  tooltip  The tooltip string.
+     */
     void update (const Colour& fill, String tooltip);
+    /**
+     * @brief      Sets the fill colour, outline colour and the tooltip.
+     *
+     * @param[in]  fill     The fill colour.
+     * @param[in]  line     The outline colour.
+     * @param[in]  tooltip  The tooltip string.
+     */
     void update (const Colour& fill, const Colour& line, String tooltip);
 private:
     Colour fillColour, lineColour;
+};
+
+
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                         CHANNEL-MAPPER-DISPLAY                           |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
+class ChannelMapperDisplay : public Component,
+                             public Slider::Listener
+{
+public:
+    ChannelMapperDisplay (CyclopsEditor* editor, CyclopsCanvas* canvas);
+    void update(CyclopsPluginInfo* pluginInfo);
+    void paint(Graphics& g);
+
+    void sliderValueChanged(Slider* s);
+    void sliderDragStarted(Slider* s);
+    void sliderDragEnded(Slider* s);
+
+    Array<int> channelMap;
+private:
+    CyclopsEditor* editor;
+    CyclopsCanvas* canvas;
+
+    OwnedArray<Slider> selectors;
 };
 
 } // NAMESPACE cyclops
