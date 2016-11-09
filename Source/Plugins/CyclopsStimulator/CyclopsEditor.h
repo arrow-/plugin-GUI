@@ -38,6 +38,7 @@ class CyclopsProcessor;
 class CyclopsCanvas;
 class IndicatorLED;
 class ChannelMapperDisplay;
+class SimpleWindow;
 
 /* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  * |                              CYCLOPS-EDITOR                              |
@@ -172,6 +173,7 @@ public:
     void refreshPluginInfo();
 
     bool channelMapStatus();
+    Array<int> getChannelMap();
     void changeCanvas(CyclopsCanvas* dest);
 
     /**
@@ -197,11 +199,13 @@ private:
     ScopedPointer<Label> comboText;
     ScopedPointer<ChannelMapperDisplay> channelMapper;
     ScopedPointer<Viewport> cmapViewport;
+    ScopedPointer<ImageButton> mapperButton;
+    ScopedPointer<SimpleWindow> mapperWindow;
 
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
 
-    static Path triangle;
+    static Image normal, down;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CyclopsEditor);
 };
@@ -253,6 +257,7 @@ class ChannelMapperDisplay : public Component,
 public:
     ChannelMapperDisplay (CyclopsEditor* editor, CyclopsCanvas* canvas);
     void update(CyclopsPluginInfo* pluginInfo);
+    bool status();
     void paint(Graphics& g);
 
     void sliderValueChanged(Slider* s);
@@ -265,6 +270,55 @@ private:
     CyclopsCanvas* canvas;
 
     OwnedArray<Slider> selectors;
+};
+
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                               SIMPLE-WINDOW                              |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
+/**
+ * @brief      Used to hold the ChannelMapperDisplay for the CyclopsEditor
+ * @details    Instance is destroyed when the CyclopsEditor is destroyed. Close
+ *             operation just hides it from view.
+ * @warning    This window should not be deleted by any code (esp. callback
+ *             function).
+ */
+class SimpleWindow : public DocumentWindow
+{
+public:
+
+    /**
+     * @brief      Creates the window, but does not show it.
+     *
+     * @param[in]  title             The title
+     * @param[in]  content           The content Component
+     * @param[in]  closeCallback_fn  The callback function that is executed when
+     *                               a window is closed.
+     */
+    SimpleWindow(const String& title, Component* content, const void (*closeCallback_fn)(DocumentWindow* dw)=nullptr);
+
+    /**
+     * @brief      Captures the event of pressing the close button.
+     * @details    Invokes the callback and hides the window.
+     */
+    void closeButtonPressed();
+    
+    /**
+     * @brief      To capture ``ESCAPE`` key
+     *
+     * @param[in]  keyPress  The KeyPress instance.
+     *
+     * @return     Always ``false``, so that the event passes to "parents".
+     */
+    bool keyPressed(const KeyPress& key);
+private:
+    Component* content;
+    /**
+     * @brief      Called when ``ESCAPE`` key is pressed, or close button is pressed.
+     * @details    After this callback is finished, we simply hide the window.
+     * @warning    Do not delete the DocumentWindow in the callback function.
+     */
+    const void (*closeCallback)(DocumentWindow* dw);
 };
 
 } // NAMESPACE cyclops

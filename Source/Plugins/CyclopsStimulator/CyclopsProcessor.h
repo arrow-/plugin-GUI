@@ -73,7 +73,7 @@ public:
     void timerCallback();
 
     void process(AudioSampleBuffer& buffer, MidiBuffer& events);
-    void handleEvent(int eventType, MidiMessage& event, int samplePosition = 0);
+    int checkForEvents(MidiBuffer& midiMessages);
     
     void setParameter(int parameterIndex, float newValue);
     void updateSettings();

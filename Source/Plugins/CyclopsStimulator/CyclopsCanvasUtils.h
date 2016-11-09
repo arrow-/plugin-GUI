@@ -16,8 +16,8 @@ namespace cyclops{
   namespace CyclopsColours{
     const Colour disconnected(0xffff3823);
     const Colour notVerified(0xff3d64ff);
-    const Colour connected(0xffc1d045);
-    const Colour errorGenFlash(0xffff7400);
+    const Colour connected(0xffc1d045); // 5e6119
+    const Colour errorGenFlash(0xffff7400); // 994500
     const Colour notReady       = disconnected;
     const Colour Ready          = connected;
     const Colour pluginSelected = notVerified;

@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace cyclops {
 
-Path CyclopsEditor::triangle = Path();
+Image CyclopsEditor::normal;
+Image CyclopsEditor::down;
 
 CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors)
     : VisualizerEditor   (parentNode, 240, useDefaultParameterEditors)
@@ -67,14 +68,57 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     addAndMakeVisible(comboText);
 
     cmapViewport = new Viewport();
-    cmapViewport->setBounds(15, 52, 210, 75);
+    cmapViewport->setBounds(0, 0, 420, 300);
     cmapViewport->setScrollBarsShown(true, false);
-    cmapViewport->setScrollBarThickness(8);
 
-    addChildComponent(cmapViewport);
     channelMapper = new ChannelMapperDisplay(this, connectedCanvas);
     cmapViewport->setViewedComponent(channelMapper, false);
 
+    // Add button that opens the ChannelMapperWindow
+    if (CyclopsEditor::normal.isNull()){
+        CyclopsEditor::normal = Image(Image::PixelFormat::ARGB, 150, 20, true);
+        CyclopsEditor::down = Image(Image::PixelFormat::ARGB, 150, 20, true);
+
+        Graphics gn(CyclopsEditor::normal);
+        gn.fillAll(Colour(0xff5e6619));
+        gn.setColour(CyclopsColours::connected);
+        gn.fillRect(0, 0, 148, 18);
+        gn.setColour(Colours::black);
+        gn.drawText("Map Channel->Slot", 0, 0, 150, 20, Justification::centred, false);
+/*
+        Graphics go(CyclopsEditor::over);
+        go.fillAll(Colour(0xff994500));
+        go.setColour(CyclopsColours::errorGenFlash);
+        go.fillRect(0, 0, 148, 18);
+        go.setColour(Colours::white);
+        go.drawText("Map Channel->Slot", 0, 0, 150, 20, Justification::centred, false);
+*/
+        Graphics gd(CyclopsEditor::down);
+        gd.fillAll(CyclopsColours::connected);
+        gd.setColour(Colour(0xff5e6619));
+        gd.fillRect(2, 2, 148, 18);
+        gd.setColour(Colours::white);
+        gd.drawText("Map Channel->Slot", 1, 1, 150, 20, Justification::centred, false);
+    }
+    mapperButton = new ImageButton("mapperButton");
+    mapperButton->setImages(true, false, true,
+                            CyclopsEditor::normal, 0.8, Colour(),
+                            CyclopsEditor::normal, 1, Colour(),
+                            CyclopsEditor::down, 1, Colour());
+    mapperButton->setBounds(45, 60, 150, 20);
+    mapperButton->addListener(this);
+    addAndMakeVisible(mapperButton);
+
+    /*
+    mapperWindowLaunchOptions->dialogTitle = "Map Channels -> sub-plugin Slots";
+    mapperWindowLaunchOptions->dialogBackgroundColour = Colours::yellow;
+    mapperWindowLaunchOptions->componentToCentreAround = connectedCanvas;
+    mapperWindowLaunchOptions->escapeKeyTriggersCloseButton = true;
+    mapperWindowLaunchOptions->useNativeTitleBar = true;
+    mapperWindowLaunchOptions->resizable = true;
+    mapperWindowLaunchOptions->useBottomRightCornerResizer = true;
+    mapperWindowLaunchOptions->content.setNonOwned(cmapViewport);
+    */
     // Add LEDs
     serialLED->setBounds(169, 6, 12, 12);
     readinessLED->setBounds(183, 6, 12, 12);
@@ -86,6 +130,9 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     // communicate with teensy.
 }
 
+/**
+ * @brief      Destroys the object.
+ */
 CyclopsEditor::~CyclopsEditor()
 {
     //DBG ("deleting cl_editor\n");
@@ -214,9 +261,11 @@ void CyclopsEditor::buttonClicked(Button* button)
         }
         connectedCanvas->broadcastButtonState(CanvasEvent::WINDOW_BUTTON, false);
     }
-    //std::cout << std::endl;
-    //std::cout << connectedCanvas->tabIndex << std::endl;
-    // Pass the button event along to "this" class.
+    else if (button == mapperButton && connectedCanvas != nullptr){
+        mapperWindow = new SimpleWindow("Map Channels -> sub-plugin Slots", cmapViewport);
+        mapperWindow->setContentNonOwned(cmapViewport, true);
+        mapperWindow->setVisible(true);
+    }
     buttonEvent(button);
 }
 
@@ -275,27 +324,20 @@ void CyclopsEditor::paint(Graphics& g)
         g.drawText (String(nodeId), 5, 49, 20, 12, Justification::left, false);
         g.addTransform(AffineTransform::rotation(M_PI/2.0, 3, 47));
         g.setFont(old);
-    }
+    }/*
     if (cmapViewport->isVisible()){
-        if (channelMapper->channelMap.size() > 3){
-            if (CyclopsEditor::triangle.isEmpty()){
-                CyclopsEditor::triangle.addTriangle(155, 80, 160, 85, 165, 80);
-            }
-            g.setColour(Colours::white);
-            g.fillPath(CyclopsEditor::triangle);
-        }
         g.setColour(Colours::black);
         Font old = g.getCurrentFont();
         g.setFont(10);
-        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 3, 100));
-        g.drawText ("OE-GUI", 3, 100, 80, 12, Justification::left, false);
-        g.addTransform(AffineTransform::rotation(M_PI/2.0, 3, 100));
+        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 3, 117));
+        g.drawText ("OE-GUI ch", 3, 117, 80, 12, Justification::left, false);
+        g.addTransform(AffineTransform::rotation(M_PI/2.0, 3, 117));
         
-        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 225, 100));
-        g.drawText ("plugin", 225, 100, 80, 12, Justification::left, false);
-        g.addTransform(AffineTransform::rotation(M_PI/2.0, 225, 100));
+        g.addTransform(AffineTransform::rotation(-M_PI/2.0, 225, 117));
+        g.drawText ("plugin ch", 225, 117, 80, 12, Justification::left, false);
+        g.addTransform(AffineTransform::rotation(M_PI/2.0, 225, 117));
         g.setFont(old);
-    }
+    }*/
 }
 
 void CyclopsEditor::disableAllInputWidgets()
@@ -437,7 +479,12 @@ void CyclopsEditor::updateReadinessIndicator(CanvasEvent event, int attribute=0)
 
 bool CyclopsEditor::channelMapStatus()
 {
-    return true;
+    return channelMapper->status();
+}
+
+Array<int> CyclopsEditor::getChannelMap()
+{
+    return channelMapper->channelMap;
 }
 
 CyclopsPluginInfo* CyclopsEditor::getPluginInfo()
@@ -605,6 +652,7 @@ ChannelMapperDisplay::ChannelMapperDisplay(CyclopsEditor* editor, CyclopsCanvas*
 void ChannelMapperDisplay::update(CyclopsPluginInfo* pluginInfo)
 {
     int delta = pluginInfo->channelCount - selectors.size();
+    int width = getParentWidth();
     if (delta < 0){
         selectors.removeLast(delta);
         channelMap.removeLast(delta);
@@ -619,7 +667,7 @@ void ChannelMapperDisplay::update(CyclopsPluginInfo* pluginInfo)
             //s->setIncDecButtonsMode(IncDecButtonMode::incDecButtonsDraggable_AutoDirection);
             s->setChangeNotificationOnlyOnRelease(true);
             s->addListener(this);
-            s->setBounds(0, i*(20+5)+5, 180, 20);
+            s->setBounds(10, i*(20+5)+5, width-100, 20);
             addAndMakeVisible(s);
             selectors.add(s);
             channelMap.add(-1);
@@ -628,15 +676,29 @@ void ChannelMapperDisplay::update(CyclopsPluginInfo* pluginInfo)
     for (int i=0; i<pluginInfo->channelCount; i++){
         selectors[i]->setValue(-1);
         selectors[i]->setRange(0, editor->getProcessor()->getNumInputs(), 1.0);
-        channelMap.set(i, -1);
+        channelMap.set(i, 0);
     }
-    setBounds(0, 0, 210, 25*selectors.size());
+    setBounds(0, 0, width, 25*selectors.size()+20);
     editor->repaint();
 }
 
+bool ChannelMapperDisplay::status()
+{
+    // do any kind of validation of slider selections...
+    // like all sliders unique
+    // like all sliders moved atleast once or whatever.
+    //
+    // No validation is a great choice too. As far as capability of the GUI is
+    // considered, every mapping is valid because the mapping from OE->plugin
+    // channels can be one-to-many.
+    return true;
+}
+
 void ChannelMapperDisplay::paint(Graphics& g){
+    g.fillAll(Colour(0x805E5E5E));
+    int width = getParentWidth();
     for (int i=0; i<selectors.size(); i++){
-        g.drawText(String(i), 180, i*(20+5)+5, 24, 20, Justification::Flags::left);
+        g.drawText(String(i), width-100+5, i*(20+5)+5, 24, 20, Justification::Flags::left);
     }
 }
 
@@ -647,5 +709,37 @@ void ChannelMapperDisplay::sliderValueChanged(Slider* s)
 
 void ChannelMapperDisplay::sliderDragStarted(Slider* s) {}
 void ChannelMapperDisplay::sliderDragEnded(Slider* s) {}
+
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                               SIMPLE-WINDOW                              |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
+
+SimpleWindow::SimpleWindow(const String& title, Component* content, const void (*closeCallback_fn)(DocumentWindow*))
+: DocumentWindow(title, Colours::lightgrey, DocumentWindow::TitleBarButtons::allButtons),
+  content(content),
+  closeCallback(closeCallback_fn)
+{
+    setVisible(false);
+    setContentNonOwned(content, true);
+    setUsingNativeTitleBar(true);
+    setResizable(true, true);
+}
+
+bool SimpleWindow::keyPressed(const KeyPress& key)
+{
+    if (key.isKeyCode(KeyPress::escapeKey)){
+        closeButtonPressed();
+    }
+    DocumentWindow::keyPressed(key);
+    return false;
+}
+
+void SimpleWindow::closeButtonPressed()
+{
+    if (closeCallback != nullptr)
+        closeCallback(this);
+    setVisible(false);
+}
 
 } // NAMESPACE cyclops

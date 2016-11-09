@@ -60,12 +60,37 @@ void CyclopsProcessor::process(AudioSampleBuffer& buffer,
                                MidiBuffer& events)
 {
     if (isParticipating)
-        checkForEvents(events);
+        ;//checkForEvents(events);
 }
 
-void CyclopsProcessor::handleEvent(int eventType, MidiMessage& event, int samplePosition/* = 0 */)
+int CyclopsProcessor::checkForEvents (MidiBuffer& midiMessages)
 {
-    plugin->handleEvent(eventType, event, samplePosition);
+    Array<Array<Event> > slotEvents;
+    Array<Event> others;
+    if (midiMessages.getNumEvents() > 0)
+    {
+        // int m = midiMessages.getNumEvents();
+        //std::cout << m << " ev ents received by node " << getNodeId() << std::endl;
+
+        MidiBuffer::Iterator i (midiMessages);
+        MidiMessage message (0xf4);
+
+        int samplePosition = 0;
+        i.setNextSamplePosition (samplePosition);
+        /*
+        while (i.getNextEvent (message, samplePosition))
+        {
+            const uint8* dataptr = message.getRawData();
+            switch (*dataptr){
+                case TTL:
+                    eventChannel = *(dataptr + 3);
+                    break;
+            }
+        }
+        */
+    }
+
+    return -1;
 }
 
 bool CyclopsProcessor::isReady()
@@ -94,7 +119,30 @@ void CyclopsProcessor::timerCallback()
 
 void CyclopsProcessor::updateSettings()
 {
-    
+    for (auto& eventChannel : eventChannels){
+        //std::cout << eventChannel->getName() << ", type: ";
+        ChannelType ctype = eventChannel->getType();
+        switch (ctype){
+            case HEADSTAGE_CHANNEL:
+                //std::cout << "HEADSTAGE_CHANNEL";
+                break;
+            case AUX_CHANNEL:
+                //std::cout << "AUX_CHANNEL";
+                break;
+            case ADC_CHANNEL:
+                //std::cout << "ADC_CHANNEL";
+                break;
+            case EVENT_CHANNEL:
+                //std::cout << "EVENT_CHANNEL";
+                break;
+            case ELECTRODE_CHANNEL:
+                //std::cout << "ELECTRODE_CHANNEL";
+                break;
+            case MESSAGE_CHANNEL:
+                //std::cout << "MESSAGE_CHANNEL";
+                break;
+        }
+    }
 }
 
 bool CyclopsProcessor::enable()

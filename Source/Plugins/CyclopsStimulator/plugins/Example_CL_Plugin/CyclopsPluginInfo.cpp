@@ -45,7 +45,7 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     infoStruct.signalCount = 4;
 
     // These are the "Code Names" of the sources (same as the enums you made in
-    // <your-plugin>.cpp) These will appear on the GUI.
+    // <your-plugin>.h) These will appear on the GUI.
     infoStruct.signalCodeNames = { "FastSquare"
                                  , "SlowSquare"
                                  , "Triangle"

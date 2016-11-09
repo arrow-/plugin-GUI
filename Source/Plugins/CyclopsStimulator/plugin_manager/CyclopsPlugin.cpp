@@ -4,27 +4,27 @@
 namespace cyclops
 {
 
-CyclopsPlugin::CyclopsPlugin() : readiness(0)
-{
+CyclopsPlugin::CyclopsPlugin()
+{}
 
+void CyclopsPlugin::setSlotChannels(Array<int> slot_channels){
+    slotChannels = slot_channels;
 }
 
-void CyclopsPlugin::setChannels(const int channelIDs[]){
-    Channels.clearQuick();
-    Channels.addArray(channelIDs, info->channelCount);
-}
+void CyclopsPlugin::handleOtherEvents(Array<Event> eventStream)
+{} 
 
-bool isReady()
-{
-    return true;
-}
-
-bool enable()
+bool CyclopsPlugin::isReady()
 {
     return true;
 }
 
-bool disable()
+bool CyclopsPlugin::enable()
+{
+    return true;
+}
+
+bool CyclopsPlugin::disable()
 {
     return true;
 }

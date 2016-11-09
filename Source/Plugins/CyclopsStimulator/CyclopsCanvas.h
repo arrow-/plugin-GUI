@@ -70,6 +70,7 @@ public:
         virtual void updateReadinessIndicator(CanvasEvent event, int attribute=0) = 0;
         virtual void refreshPluginInfo() = 0;
         virtual bool channelMapStatus() = 0;
+        virtual Array<int> getChannelMap() = 0;
         virtual void changeCanvas(CyclopsCanvas* dest) = 0;
         virtual void updateButtons(CanvasEvent whichButton, bool state) = 0;
         virtual void setInteractivity(CanvasEvent interactivity) = 0;
