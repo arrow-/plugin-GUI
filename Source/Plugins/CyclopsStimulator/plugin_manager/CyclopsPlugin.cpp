@@ -4,6 +4,15 @@
 namespace cyclops
 {
 
+Event::Event(): eventType(-1), message(nullptr), samplePosition(-1)
+{}
+
+Event::Event(int etype, MidiMessage* msg, int samplePos/* = 0 */)
+: eventType(etype),
+  message(msg),
+  samplePosition(samplePos)
+{}
+
 CyclopsPlugin::CyclopsPlugin()
 {}
 

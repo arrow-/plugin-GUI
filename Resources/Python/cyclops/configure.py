@@ -43,7 +43,7 @@ print('Setting `ARDUINO_PATH` to `%s`\n' % config['arduinoPath']);
 
 if config.get('arduinoLibPath', None) is not None:
 	print('Path to Arduino Library directory is:\n`%s`' % config['arduinoLibPath']);
-	choice = input('Do you want to change it? [n] | y');
+	choice = input('Do you want to change it? ([n] | y)');
 else:
 	choice = 'y';
 if choice != '' and choice in 'yY':

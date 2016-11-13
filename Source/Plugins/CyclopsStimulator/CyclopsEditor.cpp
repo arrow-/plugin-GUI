@@ -67,12 +67,14 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
     comboText->setColour(Label::textColourId, Colours::black);
     addAndMakeVisible(comboText);
 
-    cmapViewport = new Viewport();
-    cmapViewport->setBounds(0, 0, 420, 300);
-    cmapViewport->setScrollBarsShown(true, false);
-
     channelMapper = new ChannelMapperDisplay(this, connectedCanvas);
+
+    cmapViewport = new Viewport();
+    cmapViewport->setScrollBarsShown(true, false);
     cmapViewport->setViewedComponent(channelMapper, false);
+
+    mapperWindowDisplay = new MapperWindowDisplay(this, cmapViewport);
+    channelMapper->configure((mapperWindowDisplay->bubble).get());
 
     // Add button that opens the ChannelMapperWindow
     if (CyclopsEditor::normal.isNull()){
@@ -107,18 +109,8 @@ CyclopsEditor::CyclopsEditor(GenericProcessor* parentNode, bool useDefaultParame
                             CyclopsEditor::down, 1, Colour());
     mapperButton->setBounds(45, 60, 150, 20);
     mapperButton->addListener(this);
-    addAndMakeVisible(mapperButton);
+    addChildComponent(mapperButton);
 
-    /*
-    mapperWindowLaunchOptions->dialogTitle = "Map Channels -> sub-plugin Slots";
-    mapperWindowLaunchOptions->dialogBackgroundColour = Colours::yellow;
-    mapperWindowLaunchOptions->componentToCentreAround = connectedCanvas;
-    mapperWindowLaunchOptions->escapeKeyTriggersCloseButton = true;
-    mapperWindowLaunchOptions->useNativeTitleBar = true;
-    mapperWindowLaunchOptions->resizable = true;
-    mapperWindowLaunchOptions->useBottomRightCornerResizer = true;
-    mapperWindowLaunchOptions->content.setNonOwned(cmapViewport);
-    */
     // Add LEDs
     serialLED->setBounds(169, 6, 12, 12);
     readinessLED->setBounds(183, 6, 12, 12);
@@ -262,8 +254,10 @@ void CyclopsEditor::buttonClicked(Button* button)
         connectedCanvas->broadcastButtonState(CanvasEvent::WINDOW_BUTTON, false);
     }
     else if (button == mapperButton && connectedCanvas != nullptr){
-        mapperWindow = new SimpleWindow("Map Channels -> sub-plugin Slots", cmapViewport);
-        mapperWindow->setContentNonOwned(cmapViewport, true);
+        mapperWindowDisplay->update();
+        channelMapper->update(getPluginInfo());
+        if (mapperWindow == nullptr)
+            mapperWindow = new SimpleWindow(connectedCanvas, "Map Channels -> sub-plugin Slots on (" + String(nodeId) + ")", mapperWindowDisplay);
         mapperWindow->setVisible(true);
     }
     buttonEvent(button);
@@ -428,7 +422,7 @@ void CyclopsEditor::stopAcquisition()
 
 void CyclopsEditor::updateSettings()
 {
-    ;
+    channelMapper->update(getPluginInfo());
 }
 
 void CyclopsEditor::updateSerialIndicator(CanvasEvent event)
@@ -494,9 +488,13 @@ CyclopsPluginInfo* CyclopsEditor::getPluginInfo()
 
 void CyclopsEditor::refreshPluginInfo()
 {
-    channelMapper->update(getPluginInfo());
-    cmapViewport->setVisible(true);
-
+    CyclopsPluginInfo* pluginInfo = getPluginInfo();
+    if (pluginInfo != nullptr){
+        channelMapper->update(pluginInfo);
+        if (pluginInfo->slotCount > 0){
+            mapperButton->setVisible(true);
+        }
+    }
 }
 
 void CyclopsEditor::changeCanvas(CyclopsCanvas* dest)
@@ -555,6 +553,23 @@ int CyclopsEditor::getEditorId()
 cl_serial* CyclopsEditor::getSerial()
 {
     return &(connectedCanvas->serialInfo);
+}
+
+std::map<ChannelType, std::pair<int, int> > CyclopsEditor::analyseChannels(CyclopsEditor* editor)
+{
+    std::map<ChannelType, std::pair<int, int> > typeCount;
+    GenericProcessor* processor = editor->getProcessor();
+
+    for (int i=0; i<processor->eventChannels.size(); i++){
+        Channel* eventChannel = processor->eventChannels[i];
+        ChannelType ctype = eventChannel->getType();
+        std::map<ChannelType, std::pair<int, int> >::iterator it = typeCount.find(ctype);
+        if (it == typeCount.end())
+            typeCount[ctype] = std::pair<int, int>(i, 0);
+        else
+            it->second.second += 1;
+    }
+    return typeCount;
 }
 
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)
@@ -645,17 +660,28 @@ void IndicatorLED::update(const Colour& fill, const Colour& line, String tooltip
  * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  */
 ChannelMapperDisplay::ChannelMapperDisplay(CyclopsEditor* editor, CyclopsCanvas* canvas):
+    pluginInfo(nullptr),
     editor(editor),
-    canvas(canvas)
+    canvas(canvas),
+    bubble(nullptr)
 {}
 
-void ChannelMapperDisplay::update(CyclopsPluginInfo* pluginInfo)
+void ChannelMapperDisplay::configure(BubbleMessageComponent* b)
 {
-    int delta = pluginInfo->channelCount - selectors.size();
-    int width = getParentWidth();
+    bubble = b;
+}
+
+void ChannelMapperDisplay::update(CyclopsPluginInfo* newPluginInfo)
+{
+    pluginInfo = newPluginInfo;
+    if (pluginInfo == nullptr)
+        return;
+    // else go ahead
+    int delta = pluginInfo->slotCount - selectors.size();
     if (delta < 0){
         selectors.removeLast(delta);
         channelMap.removeLast(delta);
+        slotDetailLabels.removeLast(delta);
     }
     else if (delta > 0){
         for (int i=0; i<delta; i++){
@@ -664,22 +690,30 @@ void ChannelMapperDisplay::update(CyclopsPluginInfo* pluginInfo)
             s->setTextBoxStyle(Slider::TextEntryBoxPosition::TextBoxLeft, false, 24, 18);
             s->setVelocityBasedMode(true);
             s->setVelocityModeParameters();
-            //s->setIncDecButtonsMode(IncDecButtonMode::incDecButtonsDraggable_AutoDirection);
-            s->setChangeNotificationOnlyOnRelease(true);
+            s->setChangeNotificationOnlyOnRelease(false);
             s->addListener(this);
-            s->setBounds(10, i*(20+5)+5, width-100, 20);
+            s->setTopLeftPosition(10, i*(20+5)+5);
             addAndMakeVisible(s);
             selectors.add(s);
-            channelMap.add(-1);
+
+            Label *l = slotDetailLabels.add(new Label("detail_"+String(i)));
+            l->setFont(Font("Default", 16, Font::plain));
+            addAndMakeVisible(l);
+            channelMap.add(0);
         }
     }
-    for (int i=0; i<pluginInfo->channelCount; i++){
-        selectors[i]->setValue(-1);
-        selectors[i]->setRange(0, editor->getProcessor()->getNumInputs(), 1.0);
-        channelMap.set(i, 0);
+    typeCount = CyclopsEditor::analyseChannels(editor);
+    for (int i=0; i<selectors.size(); i++){
+        //Channel *ch = editor->getEventChannel(i);
+        int tCount = typeCount[pluginInfo->slotTypes[i]].second;
+        selectors[i]->setRange(0, tCount-1, 1);
+        selectors[i]->setTooltip(String(tCount) + " channels");
+        Label *l = slotDetailLabels[i];
+
+        l->setText(String(i).paddedLeft('0', 2) + "     " + MapperWindowDisplay::ChannelNames[pluginInfo->slotTypes[i]], NotificationType::dontSendNotification);
     }
-    setBounds(0, 0, width, 25*selectors.size()+20);
-    editor->repaint();
+    setSize(getParentWidth(), 25*selectors.size()+20);
+    repaint();
 }
 
 bool ChannelMapperDisplay::status()
@@ -695,35 +729,187 @@ bool ChannelMapperDisplay::status()
 }
 
 void ChannelMapperDisplay::paint(Graphics& g){
-    g.fillAll(Colour(0x805E5E5E));
-    int width = getParentWidth();
-    for (int i=0; i<selectors.size(); i++){
-        g.drawText(String(i), width-100+5, i*(20+5)+5, 24, 20, Justification::Flags::left);
-    }
+    g.fillAll(Colours::grey);
 }
 
 void ChannelMapperDisplay::sliderValueChanged(Slider* s)
 {
-    std::cout << s->getValue() << ":" << selectors.indexOf(s) << std::endl;
+    if (pluginInfo == nullptr)
+        return;
+    // Get chosen value
+     // First find slotIndex, and slotType
+    int slotIndex = selectors.indexOf(s);
+    ChannelType slotType = pluginInfo->slotTypes[slotIndex];
+    std::pair<int, int> tc = typeCount[slotType];
+    // thus,
+    int choice = tc.first + s->getValue(); // base + offset
+
+    // Open a BubbleComponent to show some information about the Channel
+    Channel *ch = editor->getEventChannel(choice);
+    AttributedString msg;
+    ChannelType ctype =  ch->getType();
+    // if-elseif ladder start
+    if (ctype == ChannelType::HEADSTAGE_CHANNEL){
+        ;
+    }
+    else if (ctype == ChannelType::AUX_CHANNEL){
+        ;
+    }
+    else if (ctype == ChannelType::ADC_CHANNEL){
+        ;
+    }
+    else if (ctype == ChannelType::ELECTRODE_CHANNEL){
+        // This is definitely a SpikeChannel
+        SpikeChannel* spikeChannel = reinterpret_cast<SpikeChannel*>(ch->extraData.get());
+        msg.append(ch->getName() + "\n", Font("Default", 16, Font::plain));
+        msg.append("Type: ", Font(14, Font::italic), Colours::darkgrey);
+        if (spikeChannel->dataType == SpikeChannel::SpikeDataType::Plain)
+            msg.append("Plain", Font(), Colours::black);
+        else
+            msg.append("Sorted", Font(), Colours::black);
+        msg.append("\n# Channels: ", Font(14, Font::italic), Colours::darkgrey);
+        msg.append(String(spikeChannel->numChannels), Font(), Colours::black);
+    }
+    else if (ctype == ChannelType::EVENT_CHANNEL){
+        msg.append(ch->getName(), Font("Default", 14, Font::plain));
+        msg.append("\nBitVolts: ", Font(14, Font::italic), Colours::darkgrey);
+        msg.append(String(ch->bitVolts), Font(), Colours::black);
+        msg.append("\nRate: ", Font(14, Font::italic), Colours::darkgrey);
+        String srate;
+        if (ch->sampleRate > 2000)
+            srate = String(ch->sampleRate/1000.0) + " kHz";
+        else
+            srate = String(ch->sampleRate) + " Hz";
+        msg.append(srate, Font(), Colours::black);
+        msg.append("\nSource#: ", Font(14, Font::italic), Colours::darkgrey);
+        msg.append(String(ch->sourceNodeId), Font(), Colours::black);
+    }
+    else if (ctype == ChannelType::MESSAGE_CHANNEL){
+        ;
+    }
+    else{
+        msg.append("Information for this ChannelType coming soon!", Font(14, Font::italic));
+    }
+    // ladder done
+
+    if (msg.getText().length() > 0){
+        bubble->showAt(selectors[slotIndex], msg, 1400, true);
+    }
+    // Update the Channel Map, the most functional line of all!
+    channelMap.set(slotIndex, choice);
 }
 
 void ChannelMapperDisplay::sliderDragStarted(Slider* s) {}
 void ChannelMapperDisplay::sliderDragEnded(Slider* s) {}
+
+void ChannelMapperDisplay::resized()
+{
+    int width = getParentWidth();
+    for (int i=0; i<selectors.size(); i++){
+        selectors[i]->setSize(jmax(width-180, 150), 20);
+        slotDetailLabels[i]->setBounds(jmax(width-160, 170), 5+i*25, 155, 20);
+    }
+}
+
+
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                          MAPPER-WINDOW-DISPLAY                           |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
+
+StringArray MapperWindowDisplay::ChannelNames = {
+    "HEADSTAGE",
+    "AUX",
+    "ADC",
+    "EVENT",
+    "ELECTRODE",
+    "MESSAGE"
+};
+
+MapperWindowDisplay::MapperWindowDisplay(CyclopsEditor* editor, Viewport* viewport)
+: numChannelTypes(0),
+  editor(editor),
+  viewport(viewport)
+{
+    helpLabel = new Label ("help-text", "Use the sliders to select which Event Channel is to be routed to each sub-plugin Slot 'Index' (indicated on the right)\nOn the left is a summary of Event Channels available at this hook.");
+    helpLabel->setJustificationType(Justification::Flags::horizontallyJustified);
+    addAndMakeVisible(helpLabel);
+
+    chNameLabel = new Label("channel-name-text", "");
+    chNameLabel->setJustificationType(Justification::Flags::left);
+    chNameLabel->setFont(Font("Default", 16, Font::plain));
+    addAndMakeVisible(chNameLabel);
+    chCountLabel = new Label("channel-count-text", "");
+    chCountLabel->setJustificationType(Justification::Flags::right);
+    chCountLabel->setFont(Font("Default", 16, Font::plain));
+    addAndMakeVisible(chCountLabel);
+
+    addAndMakeVisible(viewport);
+    
+    bubble = new BubbleMessageComponent();
+    bubble->setAllowedPlacement(BubbleComponent::BubblePlacement::right);
+    addAndMakeVisible(bubble);
+    bubble->isAlwaysOnTop();
+}
+
+void MapperWindowDisplay::update()
+{
+    std::map<ChannelType, std::pair<int, int> > typeCount = CyclopsEditor::analyseChannels(editor);
+    String chNameText = "",
+           chCountText = "";
+    for (auto& typeInfo: typeCount){
+        chNameText += ChannelNames[typeInfo.first] + "\n";
+        chCountText += String(typeInfo.second.second) + "\n";
+    }
+    numChannelTypes = typeCount.size();
+    chNameLabel->setText(chNameText, NotificationType::dontSendNotification);
+    chCountLabel->setText(chCountText, NotificationType::dontSendNotification);
+}
+
+void MapperWindowDisplay::resized()
+{
+    int width  = getParentWidth(),
+        height = getParentHeight();
+
+    helpLabel->setBounds(150, 10, width-160, jmax(80, numChannelTypes*20));
+    chNameLabel->setBounds(5, 28, 100, jmax(1, numChannelTypes)*20 + 5);
+    chCountLabel->setBounds(120, 28, 15, jmax(1, numChannelTypes)*20 + 5);
+
+    int ypos = 8 + jmax(20 + helpLabel->getHeight(), 40+chCountLabel->getHeight()+10);
+    viewport->setBounds(5, ypos, width-10, height-ypos-5);
+    Component* content = viewport->getViewedComponent();
+    content->setSize(width-10, content->getHeight());
+}
+
+void MapperWindowDisplay::paint(Graphics& g)
+{
+    g.drawLine(3, 27, 140, 27, 1.2);
+    g.drawText("Ch. Type", 5, 5, 100, 25, Justification::left);
+    g.drawText("Num", 100, 5, 35, 25, Justification::right);
+    
+    int width = getWidth();
+    int ypos = -16+jmax(20 + helpLabel->getHeight(), 50+chCountLabel->getHeight()+10);
+    g.setFont(Font("Default", 16, Font::bold));
+    g.drawText("Event Channel ID", 10, ypos, 140, 20, Justification::left);
+    g.drawText("Index", jmax(width-180, 180), ypos, 90, 20, Justification::left);
+    g.drawText("Slot Type", jmax(width-120, 240), ypos, 90, 20, Justification::left);
+}
 
 /* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  * |                               SIMPLE-WINDOW                              |
  * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  */
 
-SimpleWindow::SimpleWindow(const String& title, Component* content, const void (*closeCallback_fn)(DocumentWindow*))
+SimpleWindow::SimpleWindow(Component* canvas, const String& title, Component* content, const void (*closeCallback_fn)(DocumentWindow*))
 : DocumentWindow(title, Colours::lightgrey, DocumentWindow::TitleBarButtons::allButtons),
   content(content),
   closeCallback(closeCallback_fn)
 {
     setVisible(false);
-    setContentNonOwned(content, true);
+    setContentNonOwned(content, false);
     setUsingNativeTitleBar(true);
     setResizable(true, true);
+    centreAroundComponent(canvas, 520, 300);
 }
 
 bool SimpleWindow::keyPressed(const KeyPress& key)

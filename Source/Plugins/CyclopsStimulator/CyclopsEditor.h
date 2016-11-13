@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CYCLOPS_EDITOR_H
 
 #include <VisualizerEditorHeaders.h>
+#include <SpikeLib.h>
 #include "CyclopsCanvas.h"
 #include "CyclopsProcessor.h"
 
@@ -38,6 +39,7 @@ class CyclopsProcessor;
 class CyclopsCanvas;
 class IndicatorLED;
 class ChannelMapperDisplay;
+class MapperWindowDisplay;
 class SimpleWindow;
 
 /* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
@@ -182,12 +184,14 @@ public:
     void updateButtons(CanvasEvent whichButton, bool state);
     void setInteractivity(CanvasEvent interactivity);
     int  getEditorId();
-
     cl_serial* getSerial();
+
+    static std::map<ChannelType, std::pair<int, int> > analyseChannels(CyclopsEditor* editor);
 
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
 
+    ScopedPointer<ChannelMapperDisplay> channelMapper;
 private:
 
     int prepareCanvasComboList(ComboBox* combobox);
@@ -197,10 +201,11 @@ private:
     ScopedPointer<ComboBox> canvasCombo; /**< Cyclops Board chooser drop-down */
     CyclopsProcessor* processor;         /**< Parent Processor node */
     ScopedPointer<Label> comboText;
-    ScopedPointer<ChannelMapperDisplay> channelMapper;
-    ScopedPointer<Viewport> cmapViewport;
     ScopedPointer<ImageButton> mapperButton;
+
+    ScopedPointer<Viewport> cmapViewport;
     ScopedPointer<SimpleWindow> mapperWindow;
+    ScopedPointer<MapperWindowDisplay> mapperWindowDisplay;
 
     ScopedPointer<IndicatorLED> serialLED;
     ScopedPointer<IndicatorLED> readinessLED;
@@ -256,20 +261,49 @@ class ChannelMapperDisplay : public Component,
 {
 public:
     ChannelMapperDisplay (CyclopsEditor* editor, CyclopsCanvas* canvas);
+    void configure(BubbleMessageComponent* b);
     void update(CyclopsPluginInfo* pluginInfo);
     bool status();
     void paint(Graphics& g);
+    void resized();
 
     void sliderValueChanged(Slider* s);
     void sliderDragStarted(Slider* s);
     void sliderDragEnded(Slider* s);
 
     Array<int> channelMap;
+    std::map<ChannelType, std::pair<int, int> > typeCount;
+    CyclopsPluginInfo* pluginInfo;
 private:
     CyclopsEditor* editor;
     CyclopsCanvas* canvas;
-
     OwnedArray<Slider> selectors;
+    OwnedArray<Label> slotDetailLabels;
+    BubbleMessageComponent* bubble;
+};
+
+/* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ * |                           MAPPER-WINDOW-DISPLAY                          |
+ * +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+ */
+
+class MapperWindowDisplay : public Component
+{
+public:
+    MapperWindowDisplay(CyclopsEditor* editor, Viewport* viewport);
+    void update();
+    void resized();
+    void paint(Graphics& g);
+
+    int numChannelTypes;
+    static StringArray ChannelNames;
+    ScopedPointer<BubbleMessageComponent> bubble;
+private:
+    ScopedPointer<Label> chNameLabel;
+    ScopedPointer<Label> chCountLabel;
+    ScopedPointer<Label> helpLabel;
+    CyclopsEditor* editor;
+    Viewport* viewport;
 };
 
 /* +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
@@ -295,7 +329,7 @@ public:
      * @param[in]  closeCallback_fn  The callback function that is executed when
      *                               a window is closed.
      */
-    SimpleWindow(const String& title, Component* content, const void (*closeCallback_fn)(DocumentWindow* dw)=nullptr);
+    SimpleWindow(Component* canvas, const String& title, Component* content, const void (*closeCallback_fn)(DocumentWindow* dw)=nullptr);
 
     /**
      * @brief      Captures the event of pressing the close button.

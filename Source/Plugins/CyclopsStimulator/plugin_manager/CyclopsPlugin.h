@@ -41,8 +41,11 @@ struct CyclopsSource
 /**
  * @brief      Event
  */
-struct Event
+class Event
 {
+public:
+    Event();
+    Event(int etype, MidiMessage* msg, int samplPos);
     int eventType;
     MidiMessage* message;
     int samplePosition;

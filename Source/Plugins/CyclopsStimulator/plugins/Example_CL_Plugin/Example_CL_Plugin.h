@@ -30,7 +30,7 @@ public:
     int secret;
 
     Example_CL_Plugin();
-    void handleEvent(int eventType, MidiMessage& event, int samplePosition = 0);
+    void handleSlotEvents(Array<Array<cyclops::Event> > slotStreams);
     void timerTask();
 };
 

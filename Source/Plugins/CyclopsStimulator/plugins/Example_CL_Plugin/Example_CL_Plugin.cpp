@@ -10,7 +10,7 @@ Example_CL_Plugin::Example_CL_Plugin()
     delete r;
 }
 
-void Example_CL_Plugin::handleEvent(int eventType, MidiMessage& event, int samplePosition/* = 0 */)
+void Example_CL_Plugin::handleSlotEvents(Array<Array<cyclops::Event> > slotStreams)
 {
 
 }

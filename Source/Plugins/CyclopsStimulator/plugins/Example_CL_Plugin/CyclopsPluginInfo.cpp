@@ -38,8 +38,6 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     // Name of your Cyclops SubPlugin. This will appear on the GUI.
     infoStruct.Name = "Example_CL_Plugin";
 
-    // The no. of input data channels that will be monitored for events.
-    infoStruct.channelCount = 10;
     // The no. of Signals needed on the Teensy, should be same as length of the
     // vector below.
     infoStruct.signalCount = 4;
@@ -64,6 +62,28 @@ extern "C" EXPORT void getCyclopsPluginInfo(cyclops::CyclopsPluginInfo& infoStru
     // Choose the INITIAL Mode of Operation of ALL THE SIGNALS, when the experiment is
     // initialised/launched.
     infoStruct.allInitialMode   = cyclops::operationMode::LOOPBACK;
+
+
+    /* The sub-plugin routes Event Channels chosen on the GUI (at runtime) into
+     * dedicated "Event-Channel-Slots" of this sub-plugin.
+     * ``slotCount`` is the number of slots needed for this sub-plugin.
+     * Refer CyclopsStimulator online documentation to understand usage of this.
+     * You can set it to zero, to disable this feature.
+     */
+    infoStruct.slotCount = 10;
+
+    // The size of this array should be same as ``slotCount``.
+    infoStruct.slotTypes = {ChannelType::ELECTRODE_CHANNEL,
+                            ChannelType::ELECTRODE_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                            ChannelType::EVENT_CHANNEL,
+                           };
 
     infoStruct.CyclopsPluginFactory = maker_function;
 

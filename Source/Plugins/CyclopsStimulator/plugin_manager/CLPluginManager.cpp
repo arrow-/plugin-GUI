@@ -215,6 +215,10 @@ int CyclopsPluginManager::loadPlugin(const String& pluginLoc) {
         std::cout << "*CL:sPM*     (!!) signalCount doest not match no. of \"Source-Code-Types\".\nFAILED to load plugin" << pInfo.Name << std::endl;
         return -1;
     }
+    else if (pInfo.slotCount != (int)pInfo.slotTypes.size()){
+        std::cout << "*CL:sPM*     (!!) slotCount doest not match no. of \"Slot-Types\".\nFAILED to load plugin" << pInfo.Name << std::endl;
+        return -1;
+    }
     // successful load, plugin seems valid.
     pInfoMap[pInfo.Name] = pInfo;
     return 1;

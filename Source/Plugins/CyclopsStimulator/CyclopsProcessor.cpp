@@ -118,40 +118,15 @@ void CyclopsProcessor::timerCallback()
 }
 
 void CyclopsProcessor::updateSettings()
-{
-    for (auto& eventChannel : eventChannels){
-        //std::cout << eventChannel->getName() << ", type: ";
-        ChannelType ctype = eventChannel->getType();
-        switch (ctype){
-            case HEADSTAGE_CHANNEL:
-                //std::cout << "HEADSTAGE_CHANNEL";
-                break;
-            case AUX_CHANNEL:
-                //std::cout << "AUX_CHANNEL";
-                break;
-            case ADC_CHANNEL:
-                //std::cout << "ADC_CHANNEL";
-                break;
-            case EVENT_CHANNEL:
-                //std::cout << "EVENT_CHANNEL";
-                break;
-            case ELECTRODE_CHANNEL:
-                //std::cout << "ELECTRODE_CHANNEL";
-                break;
-            case MESSAGE_CHANNEL:
-                //std::cout << "MESSAGE_CHANNEL";
-                break;
-        }
-    }
-}
+{}
 
 bool CyclopsProcessor::enable()
 {
     if (isParticipating){
         DBG ("~~~~~~~~~ Cyclops Sub Plugin enabled! ~~~~~~~~~");
-        DBG ("Name (Hook-ID)    : " << pluginInfo->Name << " (" << nodeId << ")");
-        DBG ("sources (signals) : " << pluginInfo->signalCount);
-        DBG ("input-channels    : " << pluginInfo->channelCount);
+        DBG ("Name (Hook-ID)         : " << pluginInfo->Name << " (" << nodeId << ")");
+        DBG ("sources (signals)      : " << pluginInfo->signalCount);
+        DBG ("event-channel-slots    : " << pluginInfo->slotCount);
         // DANGEROUS! because the experiment will be launched only after all
         // processors are enabled, timer should not start ASAP!?
         startTimer(pluginInfo->timePeriod);
