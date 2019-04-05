@@ -186,8 +186,6 @@ public:
     int  getEditorId();
     cl_serial* getSerial();
 
-    static std::map<ChannelType, std::pair<int, int> > analyseChannels(CyclopsEditor* editor);
-
     void saveEditorParameters(XmlElement* xmlNode);
     void loadEditorParameters(XmlElement* xmlNode);
 
@@ -272,6 +270,11 @@ public:
     void sliderDragEnded(Slider* s);
 
     Array<int> channelMap;
+    /**
+     * Maps ChannelType to (start_id, count)
+     * @warning    This is stupid and bound to fail. Can be fixed only be
+     *             redesigning the Channel system.
+     */
     std::map<ChannelType, std::pair<int, int> > typeCount;
     CyclopsPluginInfo* pluginInfo;
 private:

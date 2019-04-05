@@ -73,7 +73,6 @@ public:
     void timerCallback();
 
     void process(AudioSampleBuffer& buffer, MidiBuffer& events);
-    int checkForEvents(MidiBuffer& midiMessages);
     
     void setParameter(int parameterIndex, float newValue);
     void updateSettings();
@@ -82,12 +81,16 @@ public:
     bool disable();
 
     static int getProcessorCount();
+    static std::<ChannelType, std::pair<int, int> > analyseChannels(CyclopsProcessor* processor);
 
 private:
 
     cl_serial* serialInfo;
     CyclopsPluginInfo* pluginInfo;
     CyclopsPlugin* plugin;
+    
+    std::<ChannelType, std::pair<int, int> > typeCount;
+    Array<int> channelMap;
 
     bool isOrphan, isPrimed, isParticipating;
     

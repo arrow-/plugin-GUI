@@ -63,39 +63,9 @@ void CyclopsProcessor::process(AudioSampleBuffer& buffer,
         ;//checkForEvents(events);
 }
 
-int CyclopsProcessor::checkForEvents (MidiBuffer& midiMessages)
-{
-    Array<Array<Event> > slotEvents;
-    Array<Event> others;
-    if (midiMessages.getNumEvents() > 0)
-    {
-        // int m = midiMessages.getNumEvents();
-        //std::cout << m << " ev ents received by node " << getNodeId() << std::endl;
-
-        MidiBuffer::Iterator i (midiMessages);
-        MidiMessage message (0xf4);
-
-        int samplePosition = 0;
-        i.setNextSamplePosition (samplePosition);
-        /*
-        while (i.getNextEvent (message, samplePosition))
-        {
-            const uint8* dataptr = message.getRawData();
-            switch (*dataptr){
-                case TTL:
-                    eventChannel = *(dataptr + 3);
-                    break;
-            }
-        }
-        */
-    }
-
-    return -1;
-}
-
 bool CyclopsProcessor::isReady()
 {
-    CyclopsEditor* cl_editor = dynamic_cast<CyclopsEditor*>(editor.get());
+    CyclopsEditor* cl_editor = static_cast<CyclopsEditor*>(editor.get());
     int genError, buildError, flashError;
 
     cl_editor->isReadyForLaunch(isOrphan, isPrimed, genError, buildError, flashError);
@@ -106,6 +76,8 @@ bool CyclopsProcessor::isReady()
 
         isParticipating = true;
     }
+    channelMap = cl_editor->getChannelMap();
+
     //DBG (nodeId << " > orphan primed conclude (gen, build, flash) : " << isOrphan << isPrimed  << isParticipating << " E(" << genError << ", " << buildError << ", " << flashError << ") " << "\n");
     return ((genError == 0 || genError == 15) &&
             (buildError == 0 || buildError == 15) &&
@@ -118,7 +90,9 @@ void CyclopsProcessor::timerCallback()
 }
 
 void CyclopsProcessor::updateSettings()
-{}
+{
+    typeCount = CyclopsProcessor::analyseChannels(this);
+}
 
 bool CyclopsProcessor::enable()
 {
@@ -145,6 +119,22 @@ bool CyclopsProcessor::disable()
 int CyclopsProcessor::getProcessorCount()
 {
     return node_count;
+}
+
+std::<ChannelType, std::pair<int, int> > CyclopsProcessor::analyseChannels(CyclopsProcessor* processor)
+{
+    std::map<ChannelType, std::pair<int, int> > typeCount;
+
+    for (int i=0; i<processor->eventChannels.size(); i++){
+        Channel* eventChannel = processor->eventChannels[i];
+        ChannelType ctype = eventChannel->getType();
+        std::map<ChannelType, std::pair<int, int> >::iterator it = typeCount.find(ctype);
+        if (it == typeCount.end())
+            typeCount[ctype] = std::pair<int, int>(i, 0);
+        else
+            it->second.second += 1;
+    }
+    return typeCount;
 }
 
 } // NAMESPACE cyclops

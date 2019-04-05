@@ -555,23 +555,6 @@ cl_serial* CyclopsEditor::getSerial()
     return &(connectedCanvas->serialInfo);
 }
 
-std::map<ChannelType, std::pair<int, int> > CyclopsEditor::analyseChannels(CyclopsEditor* editor)
-{
-    std::map<ChannelType, std::pair<int, int> > typeCount;
-    GenericProcessor* processor = editor->getProcessor();
-
-    for (int i=0; i<processor->eventChannels.size(); i++){
-        Channel* eventChannel = processor->eventChannels[i];
-        ChannelType ctype = eventChannel->getType();
-        std::map<ChannelType, std::pair<int, int> >::iterator it = typeCount.find(ctype);
-        if (it == typeCount.end())
-            typeCount[ctype] = std::pair<int, int>(i, 0);
-        else
-            it->second.second += 1;
-    }
-    return typeCount;
-}
-
 void CyclopsEditor::saveEditorParameters(XmlElement* xmlNode)
 {
     XmlElement* parameters = xmlNode->createNewChildElement("PARAMETERS");
@@ -702,7 +685,7 @@ void ChannelMapperDisplay::update(CyclopsPluginInfo* newPluginInfo)
             channelMap.add(0);
         }
     }
-    typeCount = CyclopsEditor::analyseChannels(editor);
+    typeCount = CyclopsProcessor::analyseChannels(editor->getProcessor());
     for (int i=0; i<selectors.size(); i++){
         //Channel *ch = editor->getEventChannel(i);
         int tCount = typeCount[pluginInfo->slotTypes[i]].second;
@@ -854,7 +837,7 @@ MapperWindowDisplay::MapperWindowDisplay(CyclopsEditor* editor, Viewport* viewpo
 
 void MapperWindowDisplay::update()
 {
-    std::map<ChannelType, std::pair<int, int> > typeCount = CyclopsEditor::analyseChannels(editor);
+    std::map<ChannelType, std::pair<int, int> > typeCount = CyclopsProcessor::analyseChannels(editor->getProcessor());
     String chNameText = "",
            chCountText = "";
     for (auto& typeInfo: typeCount){
